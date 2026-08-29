@@ -4,7 +4,6 @@ import android.os.IBinder
 import android.os.RemoteException
 import android.util.Log
 import rikka.shizuku.Shizuku
-import rikka.shizuku.ShizukuProvider
 
 /**
  * Shizuku 免 root 授权助手（官方 UserService 方案）。
@@ -81,7 +80,7 @@ object ShizukuHelper {
         // 或用 setTag(类名) 标记服务
         val svcArgs = Shizuku.UserServiceArgs(
             android.content.ComponentName(
-                ShizukuProvider.getContext()?.packageName ?: return null,
+                "com.dsha.whalepet",
                 ShizukuCommandService::class.java.name
             )
         )
