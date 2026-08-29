@@ -53,17 +53,24 @@ class MainActivity : AppCompatActivity() {
         btnStart.setOnClickListener {
             if (!Settings.canDrawOverlays(this)) {
                 // 先尝试 Shizuku 自动授权，失败再跳手动设置
-                if (ShizukuHelper.isAvailable() && ShizukuHelper.autoGrant(this)) {
-                    refreshOverlayState()
+                if (ShizukuHelper.isAvailable()) {
+                    ShizukuHelper.autoGrant(this) { ok ->
+                        if (ok) {
+                            refreshOverlayState()
+                            tryStartService()
+                        } else {
+                            toast(R.string.grant_overlay)
+                            openOverlaySettings()
+                        }
+                    }
                 } else {
                     toast(R.string.grant_overlay)
                     openOverlaySettings()
                     return@setOnClickListener
                 }
+            } else {
+                tryStartService()
             }
-            val key = etApiKey.text.toString().trim()
-            if (key.isNotBlank()) Prefs.saveApiKey(this, key)
-            startServiceCompat()
         }
 
         btnStop.setOnClickListener {
@@ -105,10 +112,19 @@ class MainActivity : AppCompatActivity() {
 
     /** 通过 Shizuku 自动授权并刷新按钮状态。 */
     private fun tryAutoGrant() {
-        if (ShizukuHelper.autoGrant(this)) {
-            toast(R.string.auto_granted)
-            refreshOverlayState()
+        ShizukuHelper.autoGrant(this) { ok ->
+            if (ok) {
+                toast(R.string.auto_granted)
+                refreshOverlayState()
+            }
         }
+    }
+
+    /** 保存 key 并启动桌宠服务。 */
+    private fun tryStartService() {
+        val key = etApiKey.text.toString().trim()
+        if (key.isNotBlank()) Prefs.saveApiKey(this, key)
+        startServiceCompat()
     }
 
     override fun onResume() {
