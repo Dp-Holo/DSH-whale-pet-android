@@ -1,112 +1,105 @@
 package com.dsha.whalepet
 
-import android.content.Context
-import android.content.pm.PackageManager
+import android.os.IBinder
+import android.os.RemoteException
 import android.util.Log
 import rikka.shizuku.Shizuku
 import rikka.shizuku.ShizukuProvider
+import rikka.shizuku.UserServiceArgs
 
 /**
- * Shizuku 免 root 授权助手。
+ * Shizuku 免 root 授权助手（官方 UserService 方案）。
  *
  * 通过 Shizuku（以 adb/shell 身份运行）自动授予本应用所需权限：
  *  - SYSTEM_ALERT_WINDOW（悬浮窗）：appops set <pkg> SYSTEM_ALERT_WINDOW allow
  *  - POST_NOTIFICATIONS（通知）：pm grant <pkg> android.permission.POST_NOTIFICATIONS
- *
- * 用户需要：手机已运行 Shizuku（ADB 或 root 方式启动），
- * 并在首次使用时在 Shizuku 弹窗里允许本应用。
  */
 object ShizukuHelper {
 
     private const val TAG = "WhalePet/Shizuku"
 
-    /** Shizuku 是否可用（服务在运行且已授权给本应用）。 */
-    fun isAvailable(): Boolean {
-        return try {
-            Shizuku.pingBinder() &&
-                Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
-        } catch (e: Throwable) {
-            false
-        }
-    }
+    /** Shizuku 服务是否在运行。 */
+    fun isShizukuRunning(): Boolean = try { Shizuku.pingBinder() } catch (e: Throwable) { false }
 
-    /** Shizuku 服务在运行但本应用还没被授权。 */
-    fun needsPermissionRequest(): Boolean {
-        return try {
-            Shizuku.pingBinder() &&
-                Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED
-        } catch (e: Throwable) {
-            false
-        }
-    }
+    /** 本应用是否已被 Shizuku 授权。 */
+    fun isGranted(): Boolean = try {
+        Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED
+    } catch (e: Throwable) { false }
 
-    /** 请求 Shizuku 授权（会弹系统授权框，用户点允许一次）。 */
+    /** Shizuku 可用（服务运行 + 已授权给本应用）。 */
+    fun isAvailable(): Boolean = isShizukuRunning() && isGranted()
+
+    /** 服务运行但本应用还没授权。 */
+    fun needsPermissionRequest(): Boolean = isShizukuRunning() && !isGranted()
+
+    /** 请求 Shizuku 授权（弹系统框，用户点允许一次）。 */
     fun requestPermission(requestCode: Int) {
-        try {
-            Shizuku.requestPermission(requestCode)
-        } catch (e: Throwable) {
+        try { Shizuku.requestPermission(requestCode) } catch (e: Throwable) {
             Log.w(TAG, "requestPermission failed", e)
         }
     }
 
-    /** 通过 Shizuku 授予悬浮窗权限。 */
-    fun grantOverlay(ctx: Context): Boolean {
-        return runShizuku(
-            "appops", "set", ctx.packageName, "SYSTEM_ALERT_WINDOW", "allow"
-        )
+    /** 一键授权：若 Shizuku 可用，自动授予悬浮窗 + 通知权限。 */
+    fun autoGrant(): Boolean {
+        if (!isAvailable()) return false
+        val ctx = ShizukuProvider.getContext() ?: return false
+        var ok = false
+        try {
+            if (!android.provider.Settings.canDrawOverlays(ctx)) {
+                ok = exec("appops", "set", ctx.packageName, "SYSTEM_ALERT_WINDOW", "allow") || ok
+            }
+        } catch (_: Throwable) { }
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 33 &&
+                ctx.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                ok = exec("pm", "grant", ctx.packageName,
+                    "android.permission.POST_NOTIFICATIONS") || ok
+            }
+        } catch (_: Throwable) { }
+        return ok
     }
 
-    /** 通过 Shizuku 授予通知权限（Android 13+ 需要）。 */
-    fun grantNotification(ctx: Context): Boolean {
-        return runShizuku(
-            "pm", "grant", ctx.packageName, "android.permission.POST_NOTIFICATIONS"
-        )
-    }
-
-    /** 通过 Shizuku 执行系统命令。 */
-    private fun runShizuku(vararg args: String): Boolean {
+    /** 通过 Shizuku UserService 执行命令，返回退出码。 */
+    private fun exec(vararg args: String): Boolean {
         if (!isAvailable()) return false
         return try {
-            // Shizuku.newProcess 以 shell 身份执行命令
-            val process = Shizuku.newProcess(args, null)
-            val exit = process.waitFor()
-            if (exit != 0) {
-                Log.w(TAG, "shizuku cmd ${args.joinToString(" ")} exit=$exit")
-            }
-            exit == 0
+            val binder = getServiceBinder() ?: return false
+            val svc = IShizukuCommand.Stub.asInterface(binder)
+            svc.exec(args.toTypedArray()) == 0
         } catch (e: Throwable) {
-            Log.w(TAG, "shizuku exec failed", e)
+            Log.w(TAG, "exec failed", e)
             false
         }
     }
 
-    /**
-     * 一键授权：若 Shizuku 可用，自动授予悬浮窗 + 通知权限。
-     * @return true 表示已通过 Shizuku 完成授权
-     */
-    fun autoGrant(ctx: Context): Boolean {
-        if (!isAvailable()) return false
-        var ok = false
-        try {
-            if (!android.provider.Settings.canDrawOverlays(ctx)) {
-                ok = grantOverlay(ctx) || ok
-            }
-        } catch (_: Throwable) {
-        }
-        // 通知权限（Android 13+）
-        try {
-            if (android.os.Build.VERSION.SDK_INT >= 33 &&
-                ctx.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED
-            ) {
-                ok = grantNotification(ctx) || ok
-            }
-        } catch (_: Throwable) {
-        }
-        return ok
-    }
+    /** 绑定并获取 ShizukuCommandService 的 binder（缓存）。 */
+    private var cachedBinder: IBinder? = null
 
-    /** 确保 ShizukuProvider 已注册（编译期引用，防混淆移除）。 */
-    @Suppress("unused")
-    private val providerClass = ShizukuProvider::class.java
+    private fun getServiceBinder(): IBinder? {
+        cachedBinder?.let { if (it.isBinderAlive) return it }
+        // Shizuku 13.x：UserServiceArgs 由 service 类名构造，
+        // bindUserService 第二参数是标准 ServiceConnection
+        val args = UserServiceArgs(ShizukuCommandService::class.java.name)
+        try {
+            val binder = Shizuku.bindUserService(
+                args,
+                object : android.content.ServiceConnection {
+                    override fun onServiceConnected(name: android.content.ComponentName, service: IBinder) {
+                        cachedBinder = service
+                    }
+
+                    override fun onServiceDisconnected(name: android.content.ComponentName) {
+                        cachedBinder = null
+                    }
+                }
+            )
+            cachedBinder = binder
+            return binder
+        } catch (e: RemoteException) {
+            Log.w(TAG, "bindUserService failed", e)
+            return null
+        }
+    }
 }
