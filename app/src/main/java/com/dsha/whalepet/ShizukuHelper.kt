@@ -15,6 +15,8 @@ import rikka.shizuku.Shizuku
 object ShizukuHelper {
 
     private const val TAG = "WhalePet/Shizuku"
+    /** 运行时真实包名（debug 版是 *.debug，硬编码会绑错 UserService）。 */
+    private var appPackageName: String? = null
 
     /** Shizuku 服务是否在运行。 */
     fun isShizukuRunning(): Boolean = try { Shizuku.pingBinder() } catch (e: Throwable) { false }
@@ -40,6 +42,7 @@ object ShizukuHelper {
     /** 一键授权：若 Shizuku 可用，自动授予悬浮窗 + 通知权限。 */
     fun autoGrant(ctx: android.content.Context): Boolean {
         if (!isAvailable()) return false
+        appPackageName = ctx.packageName
         var ok = false
         try {
             if (!android.provider.Settings.canDrawOverlays(ctx)) {
@@ -78,9 +81,10 @@ object ShizukuHelper {
         cachedBinder?.let { if (it.isBinderAlive) return it }
         // Shizuku 13.x：UserServiceArgs 由 ComponentName 构造，
         // 或用 setTag(类名) 标记服务
+        val pkg = appPackageName ?: "com.dsha.whalepet"
         val svcArgs = Shizuku.UserServiceArgs(
             android.content.ComponentName(
-                "com.dsha.whalepet",
+                pkg,
                 ShizukuCommandService::class.java.name
             )
         )
