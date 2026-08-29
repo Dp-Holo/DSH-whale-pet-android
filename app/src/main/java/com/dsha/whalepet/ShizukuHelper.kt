@@ -4,8 +4,6 @@ import android.os.IBinder
 import android.os.RemoteException
 import android.util.Log
 import rikka.shizuku.Shizuku
-import rikka.shizuku.ShizukuProvider
-import rikka.shizuku.UserServiceArgs
 
 /**
  * Shizuku 免 root 授权助手（官方 UserService 方案）。
@@ -40,9 +38,8 @@ object ShizukuHelper {
     }
 
     /** 一键授权：若 Shizuku 可用，自动授予悬浮窗 + 通知权限。 */
-    fun autoGrant(): Boolean {
+    fun autoGrant(ctx: android.content.Context): Boolean {
         if (!isAvailable()) return false
-        val ctx = ShizukuProvider.getContext() ?: return false
         var ok = false
         try {
             if (!android.provider.Settings.canDrawOverlays(ctx)) {
@@ -80,10 +77,10 @@ object ShizukuHelper {
     private fun getServiceBinder(): IBinder? {
         cachedBinder?.let { if (it.isBinderAlive) return it }
         // Shizuku 13.x：UserServiceArgs 由 service 类名构造，
-        // bindUserService 第二参数是标准 ServiceConnection
-        val args = UserServiceArgs(ShizukuCommandService::class.java.name)
+        // bindUserService 第二参数是标准 ServiceConnection，binder 经回调返回
+        val args = Shizuku.UserServiceArgs(ShizukuCommandService::class.java.name)
         try {
-            val binder = Shizuku.bindUserService(
+            Shizuku.bindUserService(
                 args,
                 object : android.content.ServiceConnection {
                     override fun onServiceConnected(name: android.content.ComponentName, service: IBinder) {
@@ -95,11 +92,10 @@ object ShizukuHelper {
                     }
                 }
             )
-            cachedBinder = binder
-            return binder
         } catch (e: RemoteException) {
             Log.w(TAG, "bindUserService failed", e)
-            return null
         }
+        // 绑定是异步的，稍后通过回调填充；这里给回调一点时间
+        return cachedBinder
     }
 }

@@ -53,7 +53,7 @@ class MainActivity : AppCompatActivity() {
         btnStart.setOnClickListener {
             if (!Settings.canDrawOverlays(this)) {
                 // 先尝试 Shizuku 自动授权，失败再跳手动设置
-                if (ShizukuHelper.isAvailable() && ShizukuHelper.autoGrant()) {
+                if (ShizukuHelper.isAvailable() && ShizukuHelper.autoGrant(this)) {
                     refreshOverlayState()
                 } else {
                     toast(R.string.grant_overlay)
@@ -105,7 +105,7 @@ class MainActivity : AppCompatActivity() {
 
     /** 通过 Shizuku 自动授权并刷新按钮状态。 */
     private fun tryAutoGrant() {
-        if (ShizukuHelper.autoGrant()) {
+        if (ShizukuHelper.autoGrant(this)) {
             toast(R.string.auto_granted)
             refreshOverlayState()
         }
