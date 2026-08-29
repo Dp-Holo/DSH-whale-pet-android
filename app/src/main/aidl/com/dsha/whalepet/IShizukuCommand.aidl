@@ -5,5 +5,5 @@ package com.dsha.whalepet;
  */
 interface IShizukuCommand {
     /** 执行命令，返回退出码。 */
-    int exec(String[] args);
+    int exec(in String[] args);
 }
