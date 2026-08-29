@@ -6,4 +6,7 @@ package com.dsha.whalepet;
 interface IShizukuCommand {
     /** 执行命令，返回退出码。 */
     int exec(in String[] args);
+
+    /** 服务销毁（Shizuku 调用，需退出进程）。 */
+    void destroy();
 }

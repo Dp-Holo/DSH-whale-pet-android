@@ -4,6 +4,7 @@ import android.os.IBinder
 import android.os.RemoteException
 import android.util.Log
 import rikka.shizuku.Shizuku
+import rikka.shizuku.ShizukuProvider
 
 /**
  * Shizuku 免 root 授权助手（官方 UserService 方案）。
@@ -76,9 +77,14 @@ object ShizukuHelper {
 
     private fun getServiceBinder(): IBinder? {
         cachedBinder?.let { if (it.isBinderAlive) return it }
-        // Shizuku 13.x：UserServiceArgs 由 service 类名构造，
-        // bindUserService 第二参数是标准 ServiceConnection，binder 经回调返回
-        val svcArgs = Shizuku.UserServiceArgs(ShizukuCommandService::class.java.name)
+        // Shizuku 13.x：UserServiceArgs 由 ComponentName 构造，
+        // 或用 setTag(类名) 标记服务
+        val svcArgs = Shizuku.UserServiceArgs(
+            android.content.ComponentName(
+                ShizukuProvider.getContext()?.packageName ?: return null,
+                ShizukuCommandService::class.java.name
+            )
+        )
         val latch = java.util.concurrent.CountDownLatch(1)
         try {
             Shizuku.bindUserService(
