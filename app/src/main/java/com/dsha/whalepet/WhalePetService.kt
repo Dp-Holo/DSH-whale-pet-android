@@ -54,9 +54,12 @@ class WhalePetService : Service() {
     private var angle = -0.4f          // 初始方向（向左上）
     private var dragging = false
 
-    // 尺寸
+    // 尺寸（0.8×：120dp → 96dp）
     private val sizePx: Int
-        get() = (120 * resources.displayMetrics.density).toInt()
+        get() = (120 * 0.8f * resources.displayMetrics.density).toInt()
+    // 窗口总高 = 鲸鱼 + 上方气泡区
+    private val winHeightPx: Int
+        get() = sizePx + (70 * resources.displayMetrics.density).toInt()
 
     // 台词池
     private val lines = arrayOf(
@@ -146,6 +149,8 @@ class WhalePetService : Service() {
     // ── 悬浮窗构建 ────────────────────────────────────────────
     private fun buildOverlay() {
         val size = sizePx
+        // 窗口高度 = 鲸鱼 + 上方气泡区（气泡不遮挡鲸鱼）
+        val winH = winHeightPx
         rootView = View.inflate(this, R.layout.overlay_whale, null)
         whaleImg = rootView.findViewById(R.id.whale_img)
         badge = rootView.findViewById(R.id.badge)
@@ -153,7 +158,7 @@ class WhalePetService : Service() {
 
         overlayParams = WindowManager.LayoutParams(
             size,
-            size,
+            winH,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
@@ -161,10 +166,10 @@ class WhalePetService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            // 初始位置：右下角
+            // 初始位置：右下角（窗口左上角 = 屏幕 - 窗口高）
             val dm = resources.displayMetrics
             x = dm.widthPixels - size - (24 * dm.density).toInt()
-            y = dm.heightPixels - size - (60 * dm.density).toInt()
+            y = dm.heightPixels - winH - (60 * dm.density).toInt()
         }
         whaleImg.setOnTouchListener(whaleTouch)
         wm.addView(rootView, overlayParams)
@@ -198,9 +203,12 @@ class WhalePetService : Service() {
                 if (abs(dx) + abs(dy) > 12) moved = true
                 downX = event.rawX
                 downY = event.rawY
-                overlayParams.x += dx.toInt()
-                overlayParams.y += dy.toInt()
+                // 统一走 x/y 再 clamp（避免与漫游逻辑分叉）
+                x += dx
+                y += dy
                 clamp()
+                overlayParams.x = x.toInt()
+                overlayParams.y = y.toInt()
                 wm.updateViewLayout(rootView, overlayParams)
                 true
             }
@@ -284,11 +292,10 @@ class WhalePetService : Service() {
         val dm = resources.displayMetrics
         val edge = (16 * dm.density).toInt()
         val maxX = dm.widthPixels - sizePx - edge
-        val maxY = dm.heightPixels - sizePx - edge
-        overlayParams.x = overlayParams.x.coerceIn(edge, maxX)
-        overlayParams.y = overlayParams.y.coerceIn(edge, maxY)
-        x = overlayParams.x.toFloat()
-        y = overlayParams.y.toFloat()
+        val maxY = dm.heightPixels - winHeightPx - edge
+        // 直接限制 x/y（不要用 overlayParams 反向覆盖，否则会抵消 stepWander 的位移）
+        x = x.coerceIn(edge.toFloat(), maxX.toFloat())
+        y = y.coerceIn(edge.toFloat(), maxY.toFloat())
     }
 
     // ── 余额：5 分钟轮询 + 头顶上浮渐隐 0.8s ──────────────────
