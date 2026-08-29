@@ -47,6 +47,9 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    // Shizuku：免 root 自动授予悬浮窗等系统权限
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
     // 余额查询走系统 HttpURLConnection（零三方依赖），无需 OkHttp。
     // 若以后想升级到协程/Compose，再在此追加依赖。
 }

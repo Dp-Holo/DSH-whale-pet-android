@@ -19,6 +19,10 @@ import androidx.appcompat.app.AppCompatActivity
  */
 class MainActivity : AppCompatActivity() {
 
+    private companion object {
+        const val REQ_SHIZUKU = 1001
+    }
+
     private lateinit var btnStart: Button
     private lateinit var btnStop: Button
     private lateinit var btnOverlay: Button
@@ -48,9 +52,14 @@ class MainActivity : AppCompatActivity() {
 
         btnStart.setOnClickListener {
             if (!Settings.canDrawOverlays(this)) {
-                toast(R.string.grant_overlay)
-                openOverlaySettings()
-                return@setOnClickListener
+                // 先尝试 Shizuku 自动授权，失败再跳手动设置
+                if (ShizukuHelper.isAvailable() && ShizukuHelper.grantOverlay(this)) {
+                    refreshOverlayState()
+                } else {
+                    toast(R.string.grant_overlay)
+                    openOverlaySettings()
+                    return@setOnClickListener
+                }
             }
             val key = etApiKey.text.toString().trim()
             if (key.isNotBlank()) Prefs.saveApiKey(this, key)
@@ -74,11 +83,44 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread { tvBalance.text = text }
             }
         }
+
+        // Shizuku：若可用则自动授予悬浮窗+通知权限（免手动跳设置页）
+        if (ShizukuHelper.needsPermissionRequest()) {
+            ShizukuHelper.requestPermission(REQ_SHIZUKU)
+        } else if (ShizukuHelper.isAvailable()) {
+            tryAutoGrant()
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQ_SHIZUKU && ShizukuHelper.isAvailable()) {
+            tryAutoGrant()
+        }
+    }
+
+    /** 通过 Shizuku 自动授权并刷新按钮状态。 */
+    private fun tryAutoGrant() {
+        if (ShizukuHelper.autoGrant(this)) {
+            toast(R.string.auto_granted)
+            refreshOverlayState()
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        // 权限状态实时反映
+        // 从 Shizuku 授权/设置页返回后再次尝试自动授权
+        if (ShizukuHelper.isAvailable() && !Settings.canDrawOverlays(this)) {
+            tryAutoGrant()
+        }
+        refreshOverlayState()
+    }
+
+    private fun refreshOverlayState() {
         if (Settings.canDrawOverlays(this)) {
             btnOverlay.setText(R.string.overlay_granted)
             btnOverlay.isEnabled = false

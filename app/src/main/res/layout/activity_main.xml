@@ -7,7 +7,9 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
         android:orientation="vertical"
+        android:gravity="center_horizontal"
         android:padding="24dp">
 
         <TextView
@@ -83,7 +85,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:gravity="center"
-            android:text="🐳 启动后鲸鱼娘会浮在屏幕上自由游泳\n单击说话 · 双击看余额 · 拖动换位置"
+            android:text="启动后鲸鱼娘会浮在屏幕上自由游泳\n单击说话 · 双击看余额 · 拖动换位置"
             android:textSize="13sp"
             android:textColor="#666666" />
     </LinearLayout>

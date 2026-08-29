@@ -3,7 +3,7 @@
     <string name="app_name">鲸鱼娘桌宠</string>
 
     <!-- 主界面 -->
-    <string name="main_title">🐳 鲸鱼娘桌宠</string>
+    <string name="main_title">鲸鱼娘桌宠</string>
     <string name="start_service">启动桌宠</string>
     <string name="stop_service">停止桌宠</string>
     <string name="grant_overlay">授予悬浮窗权限</string>
@@ -21,4 +21,5 @@
 
     <!-- 余额 -->
     <string name="no_api_key">未设置 API Key</string>
+    <string name="auto_granted">已通过 Shizuku 自动授权</string>
 </resources>
