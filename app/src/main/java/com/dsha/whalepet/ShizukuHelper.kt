@@ -64,7 +64,7 @@ object ShizukuHelper {
         return try {
             val binder = getServiceBinder() ?: return false
             val svc = IShizukuCommand.Stub.asInterface(binder)
-            svc.exec(args.toTypedArray()) == 0
+            svc.exec(args) == 0
         } catch (e: Throwable) {
             Log.w(TAG, "exec failed", e)
             false
@@ -78,13 +78,15 @@ object ShizukuHelper {
         cachedBinder?.let { if (it.isBinderAlive) return it }
         // Shizuku 13.x：UserServiceArgs 由 service 类名构造，
         // bindUserService 第二参数是标准 ServiceConnection，binder 经回调返回
-        val args = Shizuku.UserServiceArgs(ShizukuCommandService::class.java.name)
+        val svcArgs = Shizuku.UserServiceArgs(ShizukuCommandService::class.java.name)
+        val latch = java.util.concurrent.CountDownLatch(1)
         try {
             Shizuku.bindUserService(
-                args,
+                svcArgs,
                 object : android.content.ServiceConnection {
                     override fun onServiceConnected(name: android.content.ComponentName, service: IBinder) {
                         cachedBinder = service
+                        latch.countDown()
                     }
 
                     override fun onServiceDisconnected(name: android.content.ComponentName) {
@@ -95,7 +97,11 @@ object ShizukuHelper {
         } catch (e: RemoteException) {
             Log.w(TAG, "bindUserService failed", e)
         }
-        // 绑定是异步的，稍后通过回调填充；这里给回调一点时间
+        // 等待绑定回调（最长 3 秒）
+        try {
+            latch.await(3, java.util.concurrent.TimeUnit.SECONDS)
+        } catch (_: InterruptedException) {
+        }
         return cachedBinder
     }
 }
