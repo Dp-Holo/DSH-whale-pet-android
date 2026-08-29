@@ -57,9 +57,12 @@ class WhalePetService : Service() {
     // 尺寸（0.8×：120dp → 96dp）
     private val sizePx: Int
         get() = (120 * 0.8f * resources.displayMetrics.density).toInt()
+    // 窗口宽度：加宽到 240dp 容纳气泡完整文字（鲸鱼本体仍 96dp 居中）
+    private val winWidthPx: Int
+        get() = (240 * resources.displayMetrics.density).toInt()
     // 窗口总高 = 鲸鱼 + 上方气泡区
     private val winHeightPx: Int
-        get() = sizePx + (70 * resources.displayMetrics.density).toInt()
+        get() = sizePx + (80 * resources.displayMetrics.density).toInt()
 
     // 台词池
     private val lines = arrayOf(
@@ -149,15 +152,22 @@ class WhalePetService : Service() {
     // ── 悬浮窗构建 ────────────────────────────────────────────
     private fun buildOverlay() {
         val size = sizePx
-        // 窗口高度 = 鲸鱼 + 上方气泡区（气泡不遮挡鲸鱼）
+        val winW = winWidthPx
         val winH = winHeightPx
         rootView = View.inflate(this, R.layout.overlay_whale, null)
         whaleImg = rootView.findViewById(R.id.whale_img)
         badge = rootView.findViewById(R.id.badge)
         bubble = rootView.findViewById(R.id.bubble)
+        // 鲸鱼娘发光（蓝色光晕，对应 Web 版 drop-shadow）
+        whaleImg.setShadowLayer(
+            22f,
+            0f,
+            10f,
+            android.graphics.Color.argb(140, 80, 130, 255)
+        )
 
         overlayParams = WindowManager.LayoutParams(
-            size,
+            winW,
             winH,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -166,9 +176,9 @@ class WhalePetService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            // 初始位置：右下角（窗口左上角 = 屏幕 - 窗口高）
+            // 初始位置：右下角（窗口左上角 = 屏幕 - 窗口宽高）
             val dm = resources.displayMetrics
-            x = dm.widthPixels - size - (24 * dm.density).toInt()
+            x = dm.widthPixels - winW - (24 * dm.density).toInt()
             y = dm.heightPixels - winH - (60 * dm.density).toInt()
         }
         whaleImg.setOnTouchListener(whaleTouch)
@@ -184,6 +194,11 @@ class WhalePetService : Service() {
     private var lastTapAt = 0L
     private var singleTapRunnable: Runnable? = null
     private var moved = false
+    // 当前朝向：1=朝右，-1=朝左（点击缩放动画必须保留，不能硬编码覆盖）
+    private var facing = 1f
+    // 当前速度（供 clamp 反弹用）
+    private var curVx = 0f
+    private var curVy = 0f
 
     private val whaleTouch = View.OnTouchListener { v, event ->
         when (event.actionMasked) {
@@ -192,7 +207,8 @@ class WhalePetService : Service() {
                 moved = false
                 downX = event.rawX
                 downY = event.rawY
-                v.animate().scaleX(1.12f).scaleY(1.12f).setDuration(120).start()
+                // 缩放时保留朝向：scaleX = facing * 1.12
+                v.animate().scaleX(facing * 1.12f).scaleY(1.12f).setDuration(120).start()
                 v.performClick()
                 true
             }
@@ -214,7 +230,8 @@ class WhalePetService : Service() {
             }
             MotionEvent.ACTION_UP -> {
                 dragging = false
-                v.animate().scaleX(1f).scaleY(1f).setDuration(120).start()
+                // 缩放结束恢复原朝向
+                v.animate().scaleX(facing).scaleY(1f).setDuration(120).start()
                 if (moved) {
                     // 拖动结束：不触发点击
                 } else {
@@ -276,26 +293,29 @@ class WhalePetService : Service() {
         if (Random.nextFloat() < 0.0025f) {
             angle += (Random.nextFloat() - 0.5f) * (Math.PI / 2).toFloat()
         }
-        val vx = cos(angle.toDouble()).toFloat() * speed
-        val vy = sin(angle.toDouble()).toFloat() * speed
-        x += vx
-        y += vy
+        curVx = cos(angle.toDouble()).toFloat() * speed
+        curVy = sin(angle.toDouble()).toFloat() * speed
+        x += curVx
+        y += curVy
         clamp()
         overlayParams.x = x.toInt()
         overlayParams.y = y.toInt()
         wm.updateViewLayout(rootView, overlayParams)
-        // 朝向
-        whaleImg.scaleX = if (vx < 0) 1f else -1f
+        // 朝向（记录到成员，点击缩放动画复用）
+        facing = if (curVx < 0) 1f else -1f
+        whaleImg.scaleX = facing
     }
 
     private fun clamp() {
         val dm = resources.displayMetrics
-        val edge = (16 * dm.density).toInt()
-        val maxX = dm.widthPixels - sizePx - edge
+        val edge = (4 * dm.density).toInt()          // 允许贴近屏幕边缘
+        val maxX = dm.widthPixels - winWidthPx - edge
         val maxY = dm.heightPixels - winHeightPx - edge
-        // 直接限制 x/y（不要用 overlayParams 反向覆盖，否则会抵消 stepWander 的位移）
-        x = x.coerceIn(edge.toFloat(), maxX.toFloat())
-        y = y.coerceIn(edge.toFloat(), maxY.toFloat())
+        // 越界时反转对应轴速度（弹性反弹），同时限位
+        if (x < edge) { x = edge.toFloat(); curVx = abs(curVx) }
+        if (x > maxX) { x = maxX.toFloat(); curVx = -abs(curVx) }
+        if (y < edge) { y = edge.toFloat(); curVy = abs(curVy) }
+        if (y > maxY) { y = maxY.toFloat(); curVy = -abs(curVy) }
     }
 
     // ── 余额：5 分钟轮询 + 头顶上浮渐隐 0.8s ──────────────────

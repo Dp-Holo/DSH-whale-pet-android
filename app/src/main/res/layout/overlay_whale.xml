@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <!-- 上方：气泡 + 余额徽标区 -->
+    <!-- 上方：气泡 + 余额徽标区（窗口已加宽到 240dp，文字可完整显示） -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -13,7 +13,7 @@
         android:clipChildren="false"
         android:clipToPadding="false">
 
-        <!-- 对话气泡 -->
+        <!-- 对话气泡（加粗） -->
         <TextView
             android:id="@+id/bubble"
             android:layout_width="wrap_content"
@@ -27,11 +27,14 @@
             android:paddingBottom="8dp"
             android:textColor="#22315E"
             android:textSize="13sp"
-            android:maxWidth="200dp"
+            android:textStyle="bold"
+            android:maxWidth="220dp"
+            android:maxLines="3"
+            android:ellipsize="end"
             android:visibility="invisible"
             android:text="..." />
 
-        <!-- 余额徽标（#A2B4DD，气泡下方、鲸鱼上方） -->
+        <!-- 余额徽标（#A2B4DD，气泡下方、鲸鱼上方，加粗） -->
         <TextView
             android:id="@+id/badge"
             android:layout_width="wrap_content"
@@ -45,13 +48,19 @@
             android:text="余额 --" />
     </FrameLayout>
 
-    <!-- 下方：鲸鱼娘本体 -->
-    <ImageView
-        android:id="@+id/whale_img"
+    <!-- 下方：鲸鱼娘本体（水平居中） -->
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="96dp"
-        android:src="@drawable/whale"
-        android:contentDescription="鲸鱼娘"
-        android:adjustViewBounds="false"
-        android:scaleType="fitCenter" />
+        android:layout_height="96dp">
+
+        <ImageView
+            android:id="@+id/whale_img"
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:layout_gravity="center"
+            android:src="@drawable/whale"
+            android:contentDescription="鲸鱼娘"
+            android:adjustViewBounds="false"
+            android:scaleType="fitCenter" />
+    </FrameLayout>
 </LinearLayout>
