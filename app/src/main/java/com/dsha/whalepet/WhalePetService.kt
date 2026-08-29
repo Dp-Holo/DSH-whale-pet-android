@@ -407,6 +407,10 @@ class WhalePetService : Service() {
     }
 
     private fun showBadge(text: String) {
+        // 双击显示余额时，隐藏残留的单击气泡（避免气泡+余额同时出现）
+        bubbleTv.visibility = View.INVISIBLE
+        bubbleTv.animate().cancel()
+        bubbleTv.alpha = 1f
         badgeTv.text = text
         badgeTv.setTextColor(0xFFA2B4DD.toInt())
         // 复位到出现前
