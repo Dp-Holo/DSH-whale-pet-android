@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 悬浮窗鲸鱼娘：图片 + 头顶余额徽标 + 气泡 -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- 鲸鱼娘本体 -->
+    <ImageView
+        android:id="@+id/whale_img"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/whale"
+        android:contentDescription="鲸鱼娘"
+        android:adjustViewBounds="false"
+        android:scaleType="fitCenter" />
+
+    <!-- 头顶余额徽标（#A2B4DD） -->
+    <TextView
+        android:id="@+id/badge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="0dp"
+        android:textColor="#A2B4DD"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:visibility="invisible"
+        android:text="余额 --" />
+
+    <!-- 对话气泡 -->
+    <TextView
+        android:id="@+id/bubble"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="22dp"
+        android:background="@drawable/bubble_bg"
+        android:padding="8dp 12dp"
+        android:textColor="#22315E"
+        android:textSize="13sp"
+        android:maxWidth="220dp"
+        android:visibility="invisible"
+        android:text="..." />
+</FrameLayout>

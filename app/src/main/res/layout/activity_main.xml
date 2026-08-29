@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:text="@string/main_title"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="@color/ic_launcher_background"
+            android:layout_marginBottom="20dp" />
+
+        <!-- 悬浮窗权限 -->
+        <Button
+            android:id="@+id/btn_overlay"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/grant_overlay" />
+
+        <!-- API Key -->
+        <EditText
+            android:id="@+id/et_api_key"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/api_key_hint"
+            android:inputType="textPassword"
+            android:importantForAutofill="no"
+            android:layout_marginTop="12dp" />
+
+        <!-- 立即查余额 -->
+        <Button
+            android:id="@+id/btn_check_balance"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/check_balance_now"
+            android:layout_marginTop="8dp" />
+
+        <TextView
+            android:id="@+id/tv_balance"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="@string/balance_hint"
+            android:textColor="#A2B4DD"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginTop="8dp" />
+
+        <!-- 启停 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="20dp">
+
+            <Button
+                android:id="@+id/btn_start"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/start_service" />
+
+            <Button
+                android:id="@+id/btn_stop"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/stop_service" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:gravity="center"
+            android:text="🐳 启动后鲸鱼娘会浮在屏幕上自由游泳\n单击说话 · 双击看余额 · 拖动换位置"
+            android:textSize="13sp"
+            android:textColor="#666666" />
+    </LinearLayout>
+</ScrollView>

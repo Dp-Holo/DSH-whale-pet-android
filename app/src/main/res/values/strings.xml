@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">鲸鱼娘桌宠</string>
+
+    <!-- 主界面 -->
+    <string name="main_title">🐳 鲸鱼娘桌宠</string>
+    <string name="start_service">启动桌宠</string>
+    <string name="stop_service">停止桌宠</string>
+    <string name="grant_overlay">授予悬浮窗权限</string>
+    <string name="overlay_granted">悬浮窗权限已授予</string>
+    <string name="api_key_hint">粘贴 DeepSeek API Key（sk-…）</string>
+    <string name="check_balance_now">立即查余额</string>
+    <string name="balance_hint">余额将显示在鲸鱼娘头顶</string>
+    <string name="refresh_interval">刷新间隔（分钟）</string>
+
+    <!-- 通知 -->
+    <string name="notif_channel_name">鲸鱼娘桌宠</string>
+    <string name="notif_channel_desc">悬浮窗服务常驻通知</string>
+    <string name="notif_title">鲸鱼娘正在游泳</string>
+    <string name="notif_text">点按打开设置</string>
+
+    <!-- 余额 -->
+    <string name="no_api_key">未设置 API Key</string>
+</resources>

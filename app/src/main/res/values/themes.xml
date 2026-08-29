@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.WhalePet" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#A2B4DD</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#D6DEF2</item>
+        <item name="colorOnPrimaryContainer">#22315E</item>
+    </style>
+</resources>

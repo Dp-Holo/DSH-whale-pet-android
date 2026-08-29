@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 鲸鱼娘应用图标：深蓝圆底 + 白色鲸鱼简笔 -->
+    <path
+        android:fillColor="#3A5FD6"
+        android:pathData="M54,4 A50,50 0 1,0 54,104 A50,50 0 1,0 54,4 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M22,58 Q20,42 30,36 Q40,44 42,50 Q50,46 58,48 Q70,44 76,52 Q82,60 80,70 Q74,78 62,78 Q48,78 38,70 Q28,66 22,58 Z" />
+    <path
+        android:fillColor="#A2B4DD"
+        android:pathData="M58,48 Q70,44 76,52 Q82,60 80,70 L72,66 Q70,58 64,52 Z" />
+    <path
+        android:fillColor="#1C2B4A"
+        android:pathData="M44,56 A4,4 0 1,0 44,64 A4,4 0 1,0 44,56 Z" />
+    <path
+        android:fillColor="#1C2B4A"
+        android:pathData="M62,58 A4,4 0 1,0 62,66 A4,4 0 1,0 62,58 Z" />
+</vector>
