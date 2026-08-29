@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 独立气泡窗：显示在鲸鱼头顶，气泡+余额徽标 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center_horizontal">
+
+    <!-- 对话气泡（加粗，最多3行） -->
+    <TextView
+        android:id="@+id/bubble_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bubble_bg"
+        android:paddingLeft="12dp"
+        android:paddingRight="12dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:textColor="#22315E"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:maxWidth="220dp"
+        android:maxLines="3"
+        android:ellipsize="end"
+        android:visibility="invisible"
+        android:text="..." />
+
+    <!-- 余额徽标（#A2B4DD，加粗） -->
+    <TextView
+        android:id="@+id/badge_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textColor="#A2B4DD"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:visibility="invisible"
+        android:text="余额 --" />
+</LinearLayout>

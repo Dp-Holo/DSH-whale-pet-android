@@ -38,8 +38,6 @@ class WhalePetService : Service() {
     private lateinit var rootView: View
     private lateinit var overlayParams: WindowManager.LayoutParams
     private lateinit var whaleImg: ImageView
-    private lateinit var badge: TextView
-    private lateinit var bubble: TextView
 
     private val handler = Handler(Looper.getMainLooper())
     private var wanderRunnable: Runnable? = null
@@ -54,15 +52,14 @@ class WhalePetService : Service() {
     private var angle = -0.4f          // 初始方向（向左上）
     private var dragging = false
 
-    // 尺寸（0.8×：120dp → 96dp）
+    // 尺寸（0.8×：120dp → 96dp）；窗口 = 鲸鱼本体大小，可自由贴边
     private val sizePx: Int
         get() = (120 * 0.8f * resources.displayMetrics.density).toInt()
-    // 窗口宽度：加宽到 240dp 容纳气泡完整文字（鲸鱼本体仍 96dp 居中）
-    private val winWidthPx: Int
+    // 气泡/余额悬浮窗尺寸
+    private val bubbleW: Int
         get() = (240 * resources.displayMetrics.density).toInt()
-    // 窗口总高 = 鲸鱼 + 上方气泡区
-    private val winHeightPx: Int
-        get() = sizePx + (80 * resources.displayMetrics.density).toInt()
+    private val bubbleH: Int
+        get() = (90 * resources.displayMetrics.density).toInt()
 
     // 台词池
     private val lines = arrayOf(
@@ -103,6 +100,7 @@ class WhalePetService : Service() {
             wm.removeView(rootView)
         } catch (_: Exception) {
         }
+        hideBubbleWindow()
         super.onDestroy()
     }
 
@@ -149,22 +147,21 @@ class WhalePetService : Service() {
         }
     }
 
-    // ── 悬浮窗构建 ────────────────────────────────────────────
+    // ── 悬浮窗构建：鲸鱼窗口（纯尺寸，可贴边）+ 独立气泡/余额窗 ──
+    private lateinit var bubbleWin: View
+    private lateinit var bubbleTv: TextView
+    private lateinit var badgeTv: TextView
+    private lateinit var bubbleParams: WindowManager.LayoutParams
+    private var bubbleVisible = false
+
     private fun buildOverlay() {
         val size = sizePx
-        val winW = winWidthPx
-        val winH = winHeightPx
         rootView = View.inflate(this, R.layout.overlay_whale, null)
         whaleImg = rootView.findViewById(R.id.whale_img)
-        badge = rootView.findViewById(R.id.badge)
-        bubble = rootView.findViewById(R.id.bubble)
-        // 鲸鱼娘发光（蓝色光晕）：用 elevation 阴影（View 原生支持，Android 5+ 有效）
-        whaleImg.elevation = 24f
-        whaleImg.outlineProvider = android.view.ViewOutlineProvider.BOUNDS
 
         overlayParams = WindowManager.LayoutParams(
-            winW,
-            winH,
+            size,
+            size,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
@@ -172,16 +169,32 @@ class WhalePetService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            // 初始位置：右下角（窗口左上角 = 屏幕 - 窗口宽高）
+            // 初始位置：右下角
             val dm = resources.displayMetrics
-            x = dm.widthPixels - winW - (24 * dm.density).toInt()
-            y = dm.heightPixels - winH - (60 * dm.density).toInt()
+            x = dm.widthPixels - size - (24 * dm.density).toInt()
+            y = dm.heightPixels - size - (60 * dm.density).toInt()
         }
         whaleImg.setOnTouchListener(whaleTouch)
         wm.addView(rootView, overlayParams)
 
         this.x = overlayParams.x.toFloat()
         this.y = overlayParams.y.toFloat()
+
+        // 独立气泡窗（显示在鲸鱼头顶，不占鲸鱼窗口空间）
+        bubbleWin = View.inflate(this, R.layout.overlay_bubble, null)
+        bubbleTv = bubbleWin.findViewById(R.id.bubble_text)
+        badgeTv = bubbleWin.findViewById(R.id.badge_text)
+        bubbleParams = WindowManager.LayoutParams(
+            bubbleW,
+            bubbleH,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+        }
     }
 
     // ── 触摸：拖动 + 单击/双击 ─────────────────────────────────
@@ -222,6 +235,7 @@ class WhalePetService : Service() {
                 overlayParams.x = x.toInt()
                 overlayParams.y = y.toInt()
                 wm.updateViewLayout(rootView, overlayParams)
+                if (bubbleVisible) positionBubbleWindow()
                 true
             }
             MotionEvent.ACTION_UP -> {
@@ -258,15 +272,53 @@ class WhalePetService : Service() {
     }
 
     private fun sayLine(text: String) {
-        bubble.text = text
-        bubble.alpha = 0f
-        bubble.visibility = View.VISIBLE
-        bubble.animate().alpha(1f).setDuration(200).start()
-        bubbleTimer?.let(handler::removeCallbacks)
-        bubbleTimer = Runnable {
-            bubble.animate().alpha(0f).setDuration(300).start()
+        showBubbleWindow(text, clearBadge = true)
+    }
+
+    /** 显示/更新独立气泡窗（定位在鲸鱼头顶上方），返回前清掉旧定时器。 */
+    private fun showBubbleWindow(text: String, clearBadge: Boolean) {
+        bubbleTv.text = text
+        bubbleTv.visibility = View.VISIBLE
+        if (clearBadge) badgeTv.visibility = View.INVISIBLE
+        positionBubbleWindow()
+        if (!bubbleVisible) {
+            try {
+                wm.addView(bubbleWin, bubbleParams)
+                bubbleVisible = true
+            } catch (_: Exception) {
+            }
         }
+        bubbleTimer?.let(handler::removeCallbacks)
+        bubbleTimer = Runnable { hideBubbleWindow() }
         handler.postDelayed(bubbleTimer!!, 2200)
+    }
+
+    /** 把气泡窗放到鲸鱼头顶正上方（水平居中）。 */
+    private fun positionBubbleWindow() {
+        val dm = resources.displayMetrics
+        val bw = bubbleW
+        // 气泡窗中心对准鲸鱼中心
+        val centerX = x + sizePx / 2f
+        bubbleParams.x = (centerX - bw / 2f).toInt().coerceIn(0, dm.widthPixels - bw)
+        // 气泡窗底部紧贴鲸鱼顶部（留 4dp 间隙）
+        bubbleParams.y = (y - bubbleH - (4 * dm.density)).toInt()
+            .coerceAtLeast(0)
+        try {
+            wm.updateViewLayout(bubbleWin, bubbleParams)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun hideBubbleWindow() {
+        bubbleTimer?.let(handler::removeCallbacks)
+        bubbleTimer = null
+        if (bubbleVisible) {
+            try {
+                wm.removeView(bubbleWin)
+            } catch (_: Exception) {
+            }
+            bubbleVisible = false
+        }
     }
 
     // ── 自主游动（角度制，防抖）───────────────────────────────
@@ -297,6 +349,7 @@ class WhalePetService : Service() {
         overlayParams.x = x.toInt()
         overlayParams.y = y.toInt()
         wm.updateViewLayout(rootView, overlayParams)
+        if (bubbleVisible) positionBubbleWindow()
         // 朝向（记录到成员，点击缩放动画复用）
         facing = if (curVx < 0) 1f else -1f
         whaleImg.scaleX = facing
@@ -304,9 +357,9 @@ class WhalePetService : Service() {
 
     private fun clamp() {
         val dm = resources.displayMetrics
-        val edge = (4 * dm.density).toInt()          // 允许贴近屏幕边缘
-        val maxX = dm.widthPixels - winWidthPx - edge
-        val maxY = dm.heightPixels - winHeightPx - edge
+        val edge = (2 * dm.density).toInt()          // 几乎贴边
+        val maxX = dm.widthPixels - sizePx - edge
+        val maxY = dm.heightPixels - sizePx - edge
         // 越界时反转对应轴速度（弹性反弹），同时限位
         if (x < edge) { x = edge.toFloat(); curVx = abs(curVx) }
         if (x > maxX) { x = maxX.toFloat(); curVx = -abs(curVx) }
@@ -334,21 +387,29 @@ class WhalePetService : Service() {
     }
 
     private fun showBadge(text: String) {
-        badge.text = text
-        badge.setTextColor(0xFFA2B4DD.toInt())
+        badgeTv.text = text
+        badgeTv.setTextColor(0xFFA2B4DD.toInt())
         // 复位到出现前
-        badge.alpha = 0f
-        badge.translationY = 12 * resources.displayMetrics.density
-        badge.visibility = View.VISIBLE
+        badgeTv.alpha = 0f
+        badgeTv.translationY = 12 * resources.displayMetrics.density
+        badgeTv.visibility = View.VISIBLE
+        positionBubbleWindow()
+        if (!bubbleVisible) {
+            try {
+                wm.addView(bubbleWin, bubbleParams)
+                bubbleVisible = true
+            } catch (_: Exception) {
+            }
+        }
         // 上浮渐隐 0.8s
-        badge.animate()
+        badgeTv.animate()
             .alpha(1f)
             .translationY(0f)
             .setDuration(400)
             .start()
         badgeTimer?.let(handler::removeCallbacks)
         badgeTimer = Runnable {
-            badge.animate()
+            badgeTv.animate()
                 .alpha(0f)
                 .translationY(-12 * resources.displayMetrics.density)
                 .setDuration(400)

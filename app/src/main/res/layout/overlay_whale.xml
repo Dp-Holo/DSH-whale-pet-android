@@ -1,66 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 悬浮窗鲸鱼娘：上下分层，气泡/余额在上方，鲸鱼在下方，互不遮挡 -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- 鲸鱼娘本体（纯鲸鱼窗口，无气泡区，可自由贴边） -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:layout_height="match_parent">
 
-    <!-- 上方：气泡 + 余额徽标区（窗口已加宽到 240dp，文字可完整显示） -->
-    <FrameLayout
+    <ImageView
+        android:id="@+id/whale_img"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:clipChildren="false"
-        android:clipToPadding="false">
-
-        <!-- 对话气泡（加粗） -->
-        <TextView
-            android:id="@+id/bubble"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="top|center_horizontal"
-            android:layout_marginTop="4dp"
-            android:background="@drawable/bubble_bg"
-            android:paddingLeft="12dp"
-            android:paddingRight="12dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp"
-            android:textColor="#22315E"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:maxWidth="220dp"
-            android:maxLines="3"
-            android:ellipsize="end"
-            android:visibility="invisible"
-            android:text="..." />
-
-        <!-- 余额徽标（#A2B4DD，气泡下方、鲸鱼上方，加粗） -->
-        <TextView
-            android:id="@+id/badge"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom|center_horizontal"
-            android:layout_marginBottom="4dp"
-            android:textColor="#A2B4DD"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:visibility="invisible"
-            android:text="余额 --" />
-    </FrameLayout>
-
-    <!-- 下方：鲸鱼娘本体（水平居中） -->
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="96dp">
-
-        <ImageView
-            android:id="@+id/whale_img"
-            android:layout_width="96dp"
-            android:layout_height="96dp"
-            android:layout_gravity="center"
-            android:src="@drawable/whale"
-            android:contentDescription="鲸鱼娘"
-            android:adjustViewBounds="false"
-            android:scaleType="fitCenter" />
-    </FrameLayout>
-</LinearLayout>
+        android:layout_height="match_parent"
+        android:src="@drawable/whale"
+        android:contentDescription="鲸鱼娘"
+        android:adjustViewBounds="false"
+        android:scaleType="fitCenter" />
+</FrameLayout>
