@@ -41,12 +41,12 @@
                 android:value="floating_mascot_overlay" />
         </service>
 
-        <!-- Shizuku Provider：允许通过 Shizuku 免 root 授权 -->
+        <!-- Shizuku Provider：允许通过 Shizuku 免 root 授权（必须 exported=true，Shizuku 服务需跨进程访问） -->
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
             android:authorities="${applicationId}.shizuku"
             android:enabled="true"
-            android:exported="false"
+            android:exported="true"
             android:multiprocess="false"
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
     </application>
