@@ -357,9 +357,12 @@ class WhalePetService : Service() {
         overlayParams.y = y.toInt()
         wm.updateViewLayout(rootView, overlayParams)
         if (bubbleVisible) positionBubbleWindow()
-        // 朝向（记录到成员，点击缩放动画复用）
-        facing = if (curVx < 0) 1f else -1f
-        whaleImg.scaleX = facing
+        // 朝向（带滞回：只有 |vx| 足够大且方向确实反转才翻转，杜绝过零抖动抽搐）
+        val wantFacing = if (curVx < 0) 1f else -1f
+        if (abs(curVx) > speed * 0.2f && wantFacing != facing) {
+            facing = wantFacing
+            whaleImg.scaleX = facing
+        }
     }
 
     /** 系统导航栏高度（手势条/三大键），悬浮窗被限制在其上方。 */
