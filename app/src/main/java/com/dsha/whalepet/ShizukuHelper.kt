@@ -89,7 +89,7 @@ object ShizukuHelper {
         val binder = getServiceBinder() ?: return false
         return try {
             val svc = IShizukuCommand.Stub.asInterface(binder)
-            svc.exec(args.toTypedArray()) == 0
+            svc.exec(args) == 0
         } catch (e: Throwable) {
             Log.w(TAG, "exec failed", e)
             false
