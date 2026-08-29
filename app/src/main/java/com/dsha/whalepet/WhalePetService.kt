@@ -158,14 +158,9 @@ class WhalePetService : Service() {
         whaleImg = rootView.findViewById(R.id.whale_img)
         badge = rootView.findViewById(R.id.badge)
         bubble = rootView.findViewById(R.id.bubble)
-        // 鲸鱼娘发光（蓝色光晕，对应 Web 版 drop-shadow；setShadowLayer 是 Paint 方法）
-        whaleImg.paint.setShadowLayer(
-            22f,
-            0f,
-            10f,
-            android.graphics.Color.argb(140, 80, 130, 255)
-        )
-        whaleImg.setLayerType(View.LAYER_TYPE_SOFTWARE, whaleImg.paint)
+        // 鲸鱼娘发光（蓝色光晕）：用 elevation 阴影（View 原生支持，Android 5+ 有效）
+        whaleImg.elevation = 24f
+        whaleImg.outlineProvider = android.view.ViewOutlineProvider.BOUNDS
 
         overlayParams = WindowManager.LayoutParams(
             winW,
