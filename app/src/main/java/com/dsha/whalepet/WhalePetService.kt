@@ -19,6 +19,7 @@ import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.TextView
 import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
@@ -55,11 +56,9 @@ class WhalePetService : Service() {
     // 尺寸（0.8×：120dp → 96dp）；窗口 = 鲸鱼本体大小，可自由贴边
     private val sizePx: Int
         get() = (120 * 0.8f * resources.displayMetrics.density).toInt()
-    // 气泡/余额悬浮窗尺寸
+    // 气泡/余额悬浮窗尺寸（宽度固定，高度内容自适应）
     private val bubbleW: Int
         get() = (240 * resources.displayMetrics.density).toInt()
-    private val bubbleH: Int
-        get() = (90 * resources.displayMetrics.density).toInt()
 
     // 台词池
     private val lines = arrayOf(
@@ -186,7 +185,7 @@ class WhalePetService : Service() {
         badgeTv = bubbleWin.findViewById(R.id.badge_text)
         bubbleParams = WindowManager.LayoutParams(
             bubbleW,
-            bubbleH,
+            WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
@@ -285,6 +284,12 @@ class WhalePetService : Service() {
             try {
                 wm.addView(bubbleWin, bubbleParams)
                 bubbleVisible = true
+                // 主动测量，让 positionBubbleWindow 拿到真实内容高度
+                bubbleWin.measure(
+                    View.MeasureSpec.makeMeasureSpec(bubbleW, View.MeasureSpec.AT_MOST),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+                )
+                positionBubbleWindow()
             } catch (_: Exception) {
             }
         }
@@ -300,8 +305,10 @@ class WhalePetService : Service() {
         // 气泡窗中心对准鲸鱼中心
         val centerX = x + sizePx / 2f
         bubbleParams.x = (centerX - bw / 2f).toInt().coerceIn(0, dm.widthPixels - bw)
-        // 气泡窗底部紧贴鲸鱼顶部（留 4dp 间隙）
-        bubbleParams.y = (y - bubbleH - (4 * dm.density)).toInt()
+        // 用实际内容高度（WRAP_CONTENT 布局后），气泡窗底部贴紧鲸鱼顶（留 3dp 间隙）
+        val contentH = if (bubbleWin.height > 0) bubbleWin.height
+            else (60 * dm.density).toInt()
+        bubbleParams.y = (y - contentH - (3 * dm.density)).toInt()
             .coerceAtLeast(0)
         try {
             wm.updateViewLayout(bubbleWin, bubbleParams)
@@ -355,16 +362,29 @@ class WhalePetService : Service() {
         whaleImg.scaleX = facing
     }
 
+    /** 系统导航栏高度（手势条/三大键），悬浮窗被限制在其上方。 */
+    private fun navBarHeight(): Int {
+        val res = resources
+        val id = res.getIdentifier("navigation_bar_height", "dimen", "android")
+        return if (id > 0) res.getDimensionPixelSize(id) else 0
+    }
+
     private fun clamp() {
         val dm = resources.displayMetrics
         val edge = (2 * dm.density).toInt()          // 几乎贴边
         val maxX = dm.widthPixels - sizePx - edge
-        val maxY = dm.heightPixels - sizePx - edge
-        // 越界时反转对应轴速度（弹性反弹），同时限位
-        if (x < edge) { x = edge.toFloat(); curVx = abs(curVx) }
-        if (x > maxX) { x = maxX.toFloat(); curVx = -abs(curVx) }
-        if (y < edge) { y = edge.toFloat(); curVy = abs(curVy) }
-        if (y > maxY) { y = maxY.toFloat(); curVy = -abs(curVy) }
+        // 底端减去导航栏高度，鲸鱼完整显示在导航栏上方
+        val maxY = dm.heightPixels - sizePx - edge - navBarHeight()
+        // 越界时反转对应轴速度（弹性反弹）并同步 angle，确保下一帧生效
+        if (x < edge) { x = edge.toFloat(); curVx = abs(curVx); syncAngle() }
+        if (x > maxX) { x = maxX.toFloat(); curVx = -abs(curVx); syncAngle() }
+        if (y < edge) { y = edge.toFloat(); curVy = abs(curVy); syncAngle() }
+        if (y > maxY) { y = maxY.toFloat(); curVy = -abs(curVy); syncAngle() }
+    }
+
+    /** 由当前速度反算方向角，让 clamp 的反弹在下一帧生效。 */
+    private fun syncAngle() {
+        angle = atan2(curVy, curVx)
     }
 
     // ── 余额：5 分钟轮询 + 头顶上浮渐隐 0.8s ──────────────────
@@ -398,6 +418,11 @@ class WhalePetService : Service() {
             try {
                 wm.addView(bubbleWin, bubbleParams)
                 bubbleVisible = true
+                bubbleWin.measure(
+                    View.MeasureSpec.makeMeasureSpec(bubbleW, View.MeasureSpec.AT_MOST),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+                )
+                positionBubbleWindow()
             } catch (_: Exception) {
             }
         }
