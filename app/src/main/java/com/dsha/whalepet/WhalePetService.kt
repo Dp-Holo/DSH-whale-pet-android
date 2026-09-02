@@ -44,7 +44,6 @@ class WhalePetService : Service() {
     private var wanderRunnable: Runnable? = null
     private var balanceRunnable: Runnable? = null
     private var badgeTimer: Runnable? = null
-    private var popTimer: Runnable? = null
     private var bubbleTimer: Runnable? = null
 
     // 漫游状态
@@ -93,7 +92,6 @@ class WhalePetService : Service() {
         wanderRunnable?.let(handler::removeCallbacks)
         balanceRunnable?.let(handler::removeCallbacks)
         badgeTimer?.let(handler::removeCallbacks)
-        popTimer?.let(handler::removeCallbacks)
         bubbleTimer?.let(handler::removeCallbacks)
         try {
             wm.removeView(rootView)

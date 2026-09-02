@@ -33,13 +33,17 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
 
     buildFeatures {
-        viewBinding = true
+        // AIDL：Shizuku UserService 接口
         aidl = true
+    }
+}
+
+// 消除 kotlinOptions 弃用警告（Kotlin 2.x 推荐写法）
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
@@ -47,10 +51,8 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
-    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     // Shizuku：免 root 自动授予悬浮窗等系统权限
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
-    // 余额查询走系统 HttpURLConnection（零三方依赖），无需 OkHttp。
-    // 若以后想升级到协程/Compose，再在此追加依赖。
+    // 余额查询走系统 HttpURLConnection（零三方依赖）
 }

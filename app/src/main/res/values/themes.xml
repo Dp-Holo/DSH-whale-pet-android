@@ -2,9 +2,9 @@
 <resources>
     <!--
       Material 3 主题：
-      - Android 12+（API 31+）：DynamicColors 从壁纸提取主题色（Monet）
-      - 低版本：回退 Material 3 默认色
-      - 保留鲸鱼娘主题色作为低版本 fallback
+      - Android 12+（API 31+）：WhalePetApp 中 DynamicColors.applyToActivitiesIfAvailable
+        自动从壁纸提取主题色（Monet）
+      - 低版本：回退下方鲸鱼娘主题色
     -->
     <style name="Theme.WhalePet" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- 低版本 fallback 色（壁纸取色不可用时使用） -->
@@ -14,7 +14,4 @@
         <item name="colorOnPrimaryContainer">#22315E</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
     </style>
-
-    <!-- 动态取色主题（仅 API 31+ 生效，由 DynamicColors.applyToActivities 应用） -->
-    <style name="Theme.WhalePet.Dynamic" parent="Theme.Material3.DynamicColors.DayNight.NoActionBar" />
 </resources>

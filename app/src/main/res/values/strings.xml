@@ -11,7 +11,6 @@
     <string name="api_key_hint">粘贴 DeepSeek API Key（sk-…）</string>
     <string name="check_balance_now">立即查余额</string>
     <string name="balance_hint">余额将显示在鲸鱼娘头顶</string>
-    <string name="refresh_interval">刷新间隔（分钟）</string>
 
     <!-- 通知 -->
     <string name="notif_channel_name">鲸鱼娘桌宠</string>
