@@ -21,9 +21,14 @@ DeepSeek 鲸鱼娘悬浮窗桌宠——独立的 Android 应用，浮在手机�
 
 无需手动跳系统设置页。Shizuku 不可用时回退手动授权。
 
+## 📦 下载
+
+- **正式版（推荐）**：前往 [Releases](https://github.com/Dp-Holo/DSH-whale-pet-android/releases) 下载最新 `whale-pet-release.apk`（正式签名，包名 `com.dsha.whalepet`）
+- **开发版**：GitHub Actions 每次构建产物（`whale-pet-apk` artifact，包名 `com.dsha.whalepet.debug`）
+
 ## 使用
 
-1. 安装 APK（GitHub Actions 构建产物：`whale-pet-apk` artifact）
+1. 安装 APK（见上方下载；或 GitHub Actions 构建产物：`whale-pet-apk` artifact）
 2. 打开应用 → 授予悬浮窗权限（Shizuku 可用则自动）
 3. 粘贴 **DeepSeek API Key**（[platform.deepseek.com](https://platform.deepseek.com) → API Keys）
 4. 点**启动桌宠**，鲸鱼娘就浮到屏幕上啦
