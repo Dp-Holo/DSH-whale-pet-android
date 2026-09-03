@@ -22,13 +22,36 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build debug APK
-        # 用仓库自带 wrapper 固定 Gradle 8.9（setup-gradle 负责 JDK 与缓存）
-        run: ./gradlew assembleDebug --no-daemon
+      # release 签名：secrets 未配置（如 fork 环境）时跳过，release 退化为 unsigned
+      - name: Decode release keystore
+        env:
+          KS_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "${RUNNER_TEMP}/whale-release.jks"
+            echo "keystore decoded: $(ls -la ${RUNNER_TEMP}/whale-release.jks | awk '{print $5}') bytes"
+          else
+            echo "no keystore secret — release will be unsigned"
+          fi
 
-      - name: Upload APK artifact
+      - name: Build APKs (debug + release)
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/whale-release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: whale
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleDebug assembleRelease --no-daemon
+
+      - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: whale-pet-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      - name: Upload release APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: whale-pet-apk-release
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: ignore
