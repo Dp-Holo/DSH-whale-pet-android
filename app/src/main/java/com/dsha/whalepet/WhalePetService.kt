@@ -247,6 +247,13 @@ class WhalePetService : Service() {
                 v.performClick()
                 true
             }
+            // 系统手势/来电等打断触摸时必须复位拖动状态，否则鲸鱼会卡死不再游动
+            MotionEvent.ACTION_CANCEL -> {
+                dragging = false
+                moved = false
+                v.animate().scaleX(facing).scaleY(1f).setDuration(120).start()
+                true
+            }
             else -> false
         }
     }

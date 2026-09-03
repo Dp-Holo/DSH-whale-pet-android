@@ -13,9 +13,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- API Key 存于本机 SharedPreferences；关闭备份防止 Key 随云备份/ADB 备份外泄 -->
     <application
         android:name=".WhalePetApp"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher"

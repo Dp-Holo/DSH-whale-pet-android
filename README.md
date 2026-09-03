@@ -39,7 +39,7 @@ push 到 `main` 分支自动触发，或在 Actions 页手动 `Run workflow`。
 
 ```bash
 # 需要 JDK 17 + Android SDK
-gradle assembleDebug
+./gradlew assembleDebug
 # 产物：app/build/outputs/apk/debug/
 ```
 

@@ -23,8 +23,8 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build debug APK
-        # setup-gradle 自动提供 gradle 命令（项目未提交 wrapper jar 也能构建）
-        run: gradle assembleDebug --no-daemon
+        # 用仓库自带 wrapper 固定 Gradle 8.9（setup-gradle 负责 JDK 与缓存）
+        run: ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -32,11 +32,3 @@ jobs:
           name: whale-pet-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
-
-      - name: Upload release APK (unsigned)
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: whale-pet-apk-release
-          path: app/build/outputs/apk/release/*.apk
-          if-no-files-found: ignore

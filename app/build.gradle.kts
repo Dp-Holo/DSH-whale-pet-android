@@ -11,7 +11,8 @@ android {
         applicationId = "com.dsha.whalepet"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
+        // CI（GitHub Actions）里取 run number 保证每次发版 versionCode 递增；本地构建回退 1
+        versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toIntOrNull() ?: 1
         versionName = "1.0.0"
     }
 
