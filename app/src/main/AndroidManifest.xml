@@ -24,8 +24,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.WhalePet">
 
+        <!-- 主界面不出现在最近任务列表（excludeFromRecents）；从桌面图标照常进入 -->
         <activity
             android:name=".MainActivity"
+            android:excludeFromRecents="true"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

@@ -111,6 +111,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // 通知设置：跳系统通知页，用户可彻底关闭常驻通知（服务不受影响）
+        findViewById<Button>(R.id.btn_notif_settings).setOnClickListener {
+            openNotificationSettings()
+        }
+
         btnStart.setOnClickListener {
             if (!Settings.canDrawOverlays(this)) {
                 // 先尝试 Shizuku 自动授权，失败再跳手动设置
@@ -341,6 +346,26 @@ class MainActivity : AppCompatActivity() {
         } catch (_: Throwable) {
             try {
                 startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            } catch (_: Throwable) {
+            }
+        }
+    }
+
+    /** 跳系统通知设置页：用户可关闭常驻通知（前台服务仍会继续运行）。 */
+    private fun openNotificationSettings() {
+        try {
+            startActivity(
+                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+            )
+        } catch (_: Throwable) {
+            try {
+                startActivity(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:$packageName")
+                    )
+                )
             } catch (_: Throwable) {
             }
         }

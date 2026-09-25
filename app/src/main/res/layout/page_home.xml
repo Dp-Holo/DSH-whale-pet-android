@@ -88,6 +88,14 @@
             android:layout_marginTop="12dp"
             android:text="@string/battery_whitelist" />
 
+        <!-- 通知设置：跳转系统通知页，可彻底关闭常驻通知 -->
+        <Button
+            android:id="@+id/btn_notif_settings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/notif_settings" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

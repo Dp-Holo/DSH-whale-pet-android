@@ -49,4 +49,7 @@
 
     <!-- 电池状态联动 -->
     <string name="low_battery_line">电量告急…先待机一下下 💤</string>
+
+    <!-- 通知设置 -->
+    <string name="notif_settings">通知设置（可彻底关闭常驻通知）</string>
 </resources>

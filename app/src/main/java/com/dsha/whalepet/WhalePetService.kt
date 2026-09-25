@@ -178,13 +178,19 @@ class WhalePetService : Service() {
         val channelId = "whale_pet_channel"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(NotificationManager::class.java)
+            // 前台服务必须挂通知（系统硬性要求），这里把打扰降到最低：
+            // IMPORTANCE_MIN 不显示状态栏图标、无提示音/震动/角标。
+            // 注意：渠道重要性一旦创建只能由用户修改，因此不删除重建（尊重用户设置）。
             nm.createNotificationChannel(
                 NotificationChannel(
                     channelId,
                     getString(R.string.notif_channel_name),
-                    NotificationManager.IMPORTANCE_LOW
+                    NotificationManager.IMPORTANCE_MIN
                 ).apply {
                     description = getString(R.string.notif_channel_desc)
+                    setShowBadge(false)
+                    enableVibration(false)
+                    setSound(null, null)
                 }
             )
         }
