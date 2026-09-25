@@ -243,7 +243,8 @@ class WhalePetService : Service() {
                 // 缩放结束恢复原朝向
                 v.animate().scaleX(facing).scaleY(1f).setDuration(120).start()
                 if (moved) {
-                    // 拖动结束：不触发点击
+                    // 拖动结束：不触发点击；若贴着边界立即朝内弹开，避免停顿后再慢慢转身
+                    kickOffBoundary()
                 } else {
                     handleTap()
                 }
@@ -538,6 +539,31 @@ class WhalePetService : Service() {
         if (tLeft > 0f) { angle = turnToward(angle, 0f, k * tLeft); changed = true }
 
         if (changed) applyAngle()
+    }
+
+    /**
+     * 松手时若贴着边界，立即把方向设为朝内。
+     *
+     * 否则拖到底部后只能靠 softRepel 每帧 3% 慢慢转身，从水平转到朝上约需 1.5 秒，
+     * 这段时间垂直速度接近 0，看起来就是"停住不动、过一会儿才弹开"。
+     */
+    private fun kickOffBoundary() {
+        if (!boundsReady) return
+        val near = windowPx * 0.6f
+        val halfPi = (Math.PI / 2).toFloat()
+        val spread = (Math.PI / 6).toFloat()                  // ±30° 随机，避免每次都是正角
+        val jitter = (Random.nextFloat() - 0.5f) * 2f * spread
+        val target: Float? = when {
+            y > boundMaxY - near -> -halfPi + jitter          // 贴底 → 向上
+            y < boundMinY + near -> halfPi + jitter           // 贴顶 → 向下
+            x > boundMaxX - near -> Math.PI.toFloat() + jitter // 贴右 → 向左
+            x < boundMinX + near -> jitter                    // 贴左 → 向右
+            else -> null
+        }
+        if (target != null) {
+            angle = normalizeAngle(target)
+            applyAngle()
+        }
     }
 
     /** 把 from 朝 to 方向旋转 factor 比例（走最短角差）。 */
