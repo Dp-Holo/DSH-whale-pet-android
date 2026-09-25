@@ -15,6 +15,7 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.TextView
@@ -408,32 +409,75 @@ class WhalePetService : Service() {
         }
     }
 
-    // ── 窗口可移动范围（窗口 attach 后自校准）────────────────
-    // 各系统版本对 displayMetrics 与 overlay 窗口坐标的语义不一致：
-    // 直接读屏幕尺寸常常把底部边界算大，窗口实际已被系统夹住、
-    // 而位置变量仍在推进 —— 视觉上就是"贴着底边滑行、不触发反弹"。
-    // 这里改为把窗口先推到极值位置，再用 getLocationOnScreen 读回系统夹取后的真实坐标。
+    // ── 窗口可移动范围（安全区）────────────────────────────
+    // 说明：displayMetrics 与 overlay 窗口坐标语义不一致，且底部导航栏在
+    // 手势导航下高度可能是 0，导致边界算大 —— 窗口实际已被系统夹在底部，
+    // 位置变量却仍"在界内"，于是鲸鱼在底部完全不动、过一会儿才开始移动。
+    // 这里两条路取保守交集：
+    //   1) createWindowContext 拿到该 display 的真实 WindowMetrics + 系统栏 insets
+    //   2) 把窗口推到极值位置，用 getLocationOnScreen 读回系统夹取后的实测坐标
     private var boundsReady = false
     private var boundMinX = 0
     private var boundMinY = 0
     private var boundMaxX = 0
     private var boundMaxY = 0
 
+    /** 用系统 API 计算安全区可移动范围（窗口左上角坐标范围）。 */
+    private fun computeSafeBounds() {
+        val dm = resources.displayMetrics
+        var left = 0
+        var top = 0
+        var right = dm.widthPixels
+        var bottom = dm.heightPixels
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                val uiCtx = createWindowContext(
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                    null as android.os.Bundle?
+                )
+                val metrics = uiCtx.getSystemService(WindowManager::class.java).currentWindowMetrics
+                val b = metrics.bounds
+                if (b.width() > 0 && b.height() > 0) {
+                    val ins = metrics.windowInsets.getInsetsIgnoringVisibility(
+                        WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()
+                    )
+                    left = b.left + ins.left
+                    top = b.top + ins.top
+                    right = b.right - ins.right
+                    bottom = b.bottom - ins.bottom
+                }
+            } catch (_: Throwable) {
+                // 不支持则沿用 displayMetrics
+            }
+        } else {
+            val id = resources.getIdentifier("navigation_bar_height", "dimen", "android")
+            val nav = if (id > 0) resources.getDimensionPixelSize(id) else 0
+            bottom = dm.heightPixels - nav
+        }
+        boundMinX = left
+        boundMinY = top
+        boundMaxX = right - windowPx
+        boundMaxY = bottom - windowPx
+    }
+
     /** 自校准窗口可移动范围（校准期间窗口透明，避免闪烁）。 */
     private fun calibrateBounds() {
+        // 先按系统 API 算一份基准边界
+        computeSafeBounds()
         overlayParams.alpha = 0f
         overlayParams.x = -100000
         overlayParams.y = -100000
         try {
             wm.updateViewLayout(rootView, overlayParams)
         } catch (_: Exception) {
+            boundsReady = true
             return
         }
         rootView.postOnAnimation {
             val loc = IntArray(2)
             rootView.getLocationOnScreen(loc)
-            boundMinX = loc[0]
-            boundMinY = loc[1]
+            val measMinX = loc[0]
+            val measMinY = loc[1]
             overlayParams.x = 100000
             overlayParams.y = 100000
             try {
@@ -442,18 +486,18 @@ class WhalePetService : Service() {
             }
             rootView.postOnAnimation {
                 rootView.getLocationOnScreen(loc)
-                boundMaxX = loc[0]
-                boundMaxY = loc[1]
-                boundsReady = boundMaxX > boundMinX && boundMaxY > boundMinY
-                if (!boundsReady) {
-                    // 校准失败：回退为屏幕尺寸估算，仍保证边界限制生效
-                    val dm = resources.displayMetrics
-                    boundMinX = 0
-                    boundMinY = 0
-                    boundMaxX = dm.widthPixels - windowPx
-                    boundMaxY = dm.heightPixels - windowPx
-                    boundsReady = boundMaxX > 0 && boundMaxY > 0
+                val measMaxX = loc[0]
+                val measMaxY = loc[1]
+                // 与实测取保守交集：任何一路偏大都会被另一路收住
+                boundMinX = maxOf(boundMinX, measMinX)
+                boundMinY = maxOf(boundMinY, measMinY)
+                boundMaxX = minOf(boundMaxX, measMaxX)
+                boundMaxY = minOf(boundMaxY, measMaxY)
+                if (boundMaxX <= boundMinX || boundMaxY <= boundMinY) {
+                    // 实测不可靠：退回纯 API 计算值
+                    computeSafeBounds()
                 }
+                boundsReady = boundMaxX > boundMinX && boundMaxY > boundMinY
                 // 初始位置：右下角（与旧版观感一致）
                 val dm = resources.displayMetrics
                 x = (boundMaxX - (24 * dm.density).toInt()).toFloat()
