@@ -25,7 +25,7 @@
         android:visibility="invisible"
         android:text="..." />
 
-    <!-- 余额徽标（#A2B4DD，加粗；阴影右下偏移，透明度 15%） -->
+    <!-- 余额徽标（#A2B4DD，加粗；右下偏移一层浅灰色文字副本） -->
     <TextView
         android:id="@+id/badge_text"
         android:layout_width="wrap_content"
@@ -34,10 +34,10 @@
         android:textColor="#A2B4DD"
         android:textSize="12sp"
         android:textStyle="bold"
-        android:shadowColor="#26A2B4DD"
-        android:shadowDx="2"
-        android:shadowDy="2"
-        android:shadowRadius="6"
+        android:shadowColor="#C8C8C8"
+        android:shadowDx="3"
+        android:shadowDy="3"
+        android:shadowRadius="0"
         android:visibility="invisible"
         android:text="余额 --" />
 </LinearLayout>

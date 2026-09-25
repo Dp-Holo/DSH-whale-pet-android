@@ -174,6 +174,9 @@ class WhalePetService : Service() {
         this.x = overlayParams.x.toFloat()
         this.y = overlayParams.y.toFloat()
 
+        // 窗口 attach 后自校准真实可移动范围（见 calibrateBounds 注释）
+        calibrateBounds()
+
         // 独立气泡窗（显示在鲸鱼头顶，不占鲸鱼窗口空间）
         bubbleWin = View.inflate(this, R.layout.overlay_bubble, null)
         bubbleTv = bubbleWin.findViewById(R.id.bubble_text)
@@ -363,8 +366,8 @@ class WhalePetService : Service() {
     private fun stepWander() {
         if (dragging) return
         val speed = speedPx
-        // 随机偏转幅度收敛（原 0.06 → 0.03）：保留自然漫游感，减少视觉抖动
-        angle += (Random.nextFloat() - 0.5f) * 0.03f
+        // 随机偏转幅度收敛（0.06 → 0.02）：低速时最容易看出抖动，进一步平滑
+        angle += (Random.nextFloat() - 0.5f) * 0.02f
         if (Random.nextFloat() < 0.0025f) {
             angle += (Random.nextFloat() - 0.5f) * (Math.PI / 2).toFloat()
         }
@@ -387,6 +390,67 @@ class WhalePetService : Service() {
         }
     }
 
+    // ── 窗口可移动范围（窗口 attach 后自校准）────────────────
+    // 各系统版本对 displayMetrics 与 overlay 窗口坐标的语义不一致：
+    // 直接读屏幕尺寸常常把底部边界算大，窗口实际已被系统夹住、
+    // 而位置变量仍在推进 —— 视觉上就是"贴着底边滑行、不触发反弹"。
+    // 这里改为把窗口先推到极值位置，再用 getLocationOnScreen 读回系统夹取后的真实坐标。
+    private var boundsReady = false
+    private var boundMinX = 0
+    private var boundMinY = 0
+    private var boundMaxX = 0
+    private var boundMaxY = 0
+
+    /** 自校准窗口可移动范围（校准期间窗口透明，避免闪烁）。 */
+    private fun calibrateBounds() {
+        overlayParams.alpha = 0f
+        overlayParams.x = -100000
+        overlayParams.y = -100000
+        try {
+            wm.updateViewLayout(rootView, overlayParams)
+        } catch (_: Exception) {
+            return
+        }
+        rootView.postOnAnimation {
+            val loc = IntArray(2)
+            rootView.getLocationOnScreen(loc)
+            boundMinX = loc[0]
+            boundMinY = loc[1]
+            overlayParams.x = 100000
+            overlayParams.y = 100000
+            try {
+                wm.updateViewLayout(rootView, overlayParams)
+            } catch (_: Exception) {
+            }
+            rootView.postOnAnimation {
+                rootView.getLocationOnScreen(loc)
+                boundMaxX = loc[0]
+                boundMaxY = loc[1]
+                boundsReady = boundMaxX > boundMinX && boundMaxY > boundMinY
+                if (!boundsReady) {
+                    // 校准失败：回退为屏幕尺寸估算，仍保证边界限制生效
+                    val dm = resources.displayMetrics
+                    boundMinX = 0
+                    boundMinY = 0
+                    boundMaxX = dm.widthPixels - windowPx
+                    boundMaxY = dm.heightPixels - windowPx
+                    boundsReady = boundMaxX > 0 && boundMaxY > 0
+                }
+                // 初始位置：右下角（与旧版观感一致）
+                val dm = resources.displayMetrics
+                x = (boundMaxX - (24 * dm.density).toInt()).toFloat()
+                y = (boundMaxY - (60 * dm.density).toInt()).toFloat()
+                overlayParams.x = x.roundToInt()
+                overlayParams.y = y.roundToInt()
+                overlayParams.alpha = 1f
+                try {
+                    wm.updateViewLayout(rootView, overlayParams)
+                } catch (_: Exception) {
+                }
+            }
+        }
+    }
+
     /**
      * 边界处理：越界时吸附到边界，并按镜面反射调整方向角。
      *
@@ -396,19 +460,19 @@ class WhalePetService : Service() {
      * 限制出射角后每次触边都会以自然但不拖沓的角度明确弹开。
      */
     private fun clamp() {
-        val dm = resources.displayMetrics
-        val edge = (2 * dm.density).toInt()          // 几乎贴边
-        val maxX = dm.widthPixels - windowPx - edge
-        // 窗口未使用 FLAG_LAYOUT_NO_LIMITS：坐标系即安全区（已排除状态栏／底部手势条），
-        // 且系统会兜底约束窗口不越过导航栏，因此鲸鱼不会超出屏幕底部
-        val maxY = dm.heightPixels - windowPx - edge
+        if (!boundsReady) return                     // 自校准完成前不做边界限制
+        val edge = (2 * resources.displayMetrics.density).toInt()
+        val minX = boundMinX + edge
+        val minY = boundMinY + edge
+        val maxX = boundMaxX - edge
+        val maxY = boundMaxY - edge
 
         val halfPi = (Math.PI / 2).toFloat()
         val limit = (Math.PI / 3).toFloat()          // 60°
         var bounced = false                          // 角部同时越界时只反射一次
 
-        if (x < edge) {                              // 撞左 → 向右
-            x = edge.toFloat()
+        if (x < minX) {                              // 撞左 → 向右
+            x = minX.toFloat()
             if (!bounced) {
                 angle = normalizeAngle(Math.PI.toFloat() - angle).coerceIn(-limit, limit)
                 bounced = true
@@ -426,8 +490,8 @@ class WhalePetService : Service() {
             }
         }
 
-        if (y < edge) {                              // 撞顶 → 向下
-            y = edge.toFloat()
+        if (y < minY) {                              // 撞顶 → 向下
+            y = minY.toFloat()
             if (!bounced) {
                 angle = normalizeAngle(-angle).coerceIn(halfPi - limit, halfPi + limit)
                 bounced = true

@@ -56,7 +56,11 @@
             android:text="@string/balance_hint"
             android:textColor="#A2B4DD"
             android:textSize="16sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:shadowColor="#C8C8C8"
+            android:shadowDx="3"
+            android:shadowDy="3"
+            android:shadowRadius="0" />
 
         <!-- 启停 -->
         <LinearLayout
