@@ -15,6 +15,7 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.TextView
@@ -381,12 +382,34 @@ class WhalePetService : Service() {
         return if (id > 0) res.getDimensionPixelSize(id) else 0
     }
 
+    /**
+     * 底部系统栏真实高度（像素）。
+     *
+     * 优先用 WindowMetrics 的系统栏 insets：手势导航下
+     * `navigation_bar_height` 在部分 ROM（如 MIUI/HyperOS）返回 0，
+     * 窗口会一路贴到物理屏幕底部、被小白条盖住下半身；insets 才可靠。
+     */
+    private fun bottomSafeInset(): Int {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                val wm = getSystemService(WindowManager::class.java)
+                val insets = wm.currentWindowMetrics.windowInsets.getInsetsIgnoringVisibility(
+                    WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()
+                )
+                if (insets.bottom > 0) return insets.bottom
+            } catch (_: Throwable) {
+                // 某些上下文不支持 WindowMetrics：回退传统方式
+            }
+        }
+        return navBarHeight()
+    }
+
     private fun clamp() {
         val dm = resources.displayMetrics
         val edge = (2 * dm.density).toInt()          // 几乎贴边
         val maxX = dm.widthPixels - sizePx - edge
-        // 底端减去导航栏高度，鲸鱼完整显示在导航栏上方
-        val maxY = dm.heightPixels - sizePx - edge - navBarHeight()
+        // 底端减去系统栏真实高度，鲸鱼完整显示在小白条/导航栏上方
+        val maxY = dm.heightPixels - sizePx - edge - bottomSafeInset()
         // 越界时反转对应轴速度（弹性反弹）并同步 angle，确保下一帧生效
         if (x < edge) { x = edge.toFloat(); curVx = abs(curVx); syncAngle() }
         if (x > maxX) { x = maxX.toFloat(); curVx = -abs(curVx); syncAngle() }

@@ -16,6 +16,8 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.color.MaterialColors
 
 /**
@@ -46,6 +48,16 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        // 适配 edge-to-edge：内容整体避开顶部状态栏与底部手势小白条
+        val rootLayout = findViewById<View>(R.id.root_layout)
+        ViewCompat.setOnApplyWindowInsetsListener(rootLayout) { v, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            WindowInsetsCompat.CONSUMED
+        }
 
         btnStart = findViewById(R.id.btn_start)
         btnStop = findViewById(R.id.btn_stop)
