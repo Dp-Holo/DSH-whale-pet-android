@@ -251,11 +251,14 @@ class WhalePetService : Service() {
                 v.performClick()
                 true
             }
-            // 系统手势/来电等打断触摸时必须复位拖动状态，否则鲸鱼会卡死不再游动
+            // 系统手势/来电等打断触摸时必须复位拖动状态，否则鲸鱼会卡死不再游动。
+            // 底部小白条区域上滑会被系统手势抢走触摸（收到 ACTION_CANCEL 而非 ACTION_UP），
+            // 因此这里同样要执行"贴边立即弹开"，否则只有底部会出现松手后停住。
             MotionEvent.ACTION_CANCEL -> {
                 dragging = false
                 moved = false
                 v.animate().scaleX(facing).scaleY(1f).setDuration(120).start()
+                kickOffBoundary()
                 true
             }
             else -> false
@@ -549,7 +552,7 @@ class WhalePetService : Service() {
      */
     private fun kickOffBoundary() {
         if (!boundsReady) return
-        val near = windowPx * 0.6f
+        val near = windowPx * 0.9f                        // 判定"贴边"的范围（放宽，覆盖拖到边缘附近即松手）
         val halfPi = (Math.PI / 2).toFloat()
         val spread = (Math.PI / 6).toFloat()                  // ±30° 随机，避免每次都是正角
         val jitter = (Random.nextFloat() - 0.5f) * 2f * spread
