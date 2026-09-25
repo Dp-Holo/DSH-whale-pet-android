@@ -140,7 +140,9 @@ class WhalePetService : Service() {
     // ── 悬浮窗构建：鲸鱼窗口（纯尺寸，可贴边）+ 独立气泡/余额窗 ──
     private lateinit var bubbleWin: View
     private lateinit var bubbleTv: TextView
+    private lateinit var badgeBox: View
     private lateinit var badgeTv: TextView
+    private lateinit var badgeShadowTv: TextView
     private lateinit var bubbleParams: WindowManager.LayoutParams
     private var bubbleVisible = false
 
@@ -180,7 +182,9 @@ class WhalePetService : Service() {
         // 独立气泡窗（显示在鲸鱼头顶，不占鲸鱼窗口空间）
         bubbleWin = View.inflate(this, R.layout.overlay_bubble, null)
         bubbleTv = bubbleWin.findViewById(R.id.bubble_text)
+        badgeBox = bubbleWin.findViewById(R.id.badge_box)
         badgeTv = bubbleWin.findViewById(R.id.badge_text)
+        badgeShadowTv = bubbleWin.findViewById(R.id.badge_shadow_text)
         bubbleParams = WindowManager.LayoutParams(
             bubbleW,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -302,7 +306,7 @@ class WhalePetService : Service() {
     private fun showBubbleWindow(text: String, clearBadge: Boolean) {
         bubbleTv.text = text
         bubbleTv.visibility = View.VISIBLE
-        if (clearBadge) badgeTv.visibility = View.INVISIBLE
+        if (clearBadge) badgeBox.visibility = View.INVISIBLE
         positionBubbleWindow()
         if (!bubbleVisible) {
             try {
@@ -505,6 +509,41 @@ class WhalePetService : Service() {
         }
 
         if (bounced) applyAngle()
+
+        // 近边界软排斥：避免以接近水平的角度长期贴着边游动（看起来像滑行）
+        softRepel(minX, minY, maxX, maxY)
+    }
+
+    /**
+     * 边界软排斥：靠近边界时把方向逐渐转向内侧。
+     *
+     * 仅靠硬边界反弹无法避免"贴着底边水平游动"：鲸鱼可以长期保持接近水平的角度
+     * 在边界附近移动（y 变化≈0，永远不触发反弹），视觉上就是贴边滑行。
+     * 这里在距边界一定范围内持续施加很小的向内偏转，让它自然离开边缘。
+     */
+    private fun softRepel(minX: Float, minY: Float, maxX: Float, maxY: Float) {
+        val band = windowPx * 0.6f                        // 感知带宽度
+        if (band <= 0f) return
+        val halfPi = (Math.PI / 2).toFloat()
+        val k = 0.06f                                     // 每帧最大偏转比例
+        var changed = false
+
+        val tBottom = ((y - (maxY - band)) / band).coerceIn(0f, 1f)
+        if (tBottom > 0f) { angle = turnToward(angle, -halfPi, k * tBottom); changed = true }
+        val tTop = (((minY + band) - y) / band).coerceIn(0f, 1f)
+        if (tTop > 0f) { angle = turnToward(angle, halfPi, k * tTop); changed = true }
+        val tRight = ((x - (maxX - band)) / band).coerceIn(0f, 1f)
+        if (tRight > 0f) { angle = turnToward(angle, Math.PI.toFloat(), k * tRight); changed = true }
+        val tLeft = (((minX + band) - x) / band).coerceIn(0f, 1f)
+        if (tLeft > 0f) { angle = turnToward(angle, 0f, k * tLeft); changed = true }
+
+        if (changed) applyAngle()
+    }
+
+    /** 把 from 朝 to 方向旋转 factor 比例（走最短角差）。 */
+    private fun turnToward(from: Float, to: Float, factor: Float): Float {
+        val diff = normalizeAngle(to - from)
+        return normalizeAngle(from + diff * factor.coerceIn(0f, 1f))
     }
 
     /** 由当前方向角重算速度分量（反弹后立即生效）。 */
@@ -547,11 +586,12 @@ class WhalePetService : Service() {
         bubbleTv.animate().cancel()
         bubbleTv.alpha = 1f
         badgeTv.text = text
+        badgeShadowTv.text = text
         badgeTv.setTextColor(0xFFA2B4DD.toInt())
-        // 复位到出现前
-        badgeTv.alpha = 0f
-        badgeTv.translationY = 12 * resources.displayMetrics.density
-        badgeTv.visibility = View.VISIBLE
+        // 复位到出现前（整组一起动画，主文字与浅灰副本保持相对偏移）
+        badgeBox.alpha = 0f
+        badgeBox.translationY = 12 * resources.displayMetrics.density
+        badgeBox.visibility = View.VISIBLE
         positionBubbleWindow()
         if (!bubbleVisible) {
             try {
@@ -566,14 +606,14 @@ class WhalePetService : Service() {
             }
         }
         // 上浮渐隐 0.8s
-        badgeTv.animate()
+        badgeBox.animate()
             .alpha(1f)
             .translationY(0f)
             .setDuration(400)
             .start()
         badgeTimer?.let(handler::removeCallbacks)
         badgeTimer = Runnable {
-            badgeTv.animate()
+            badgeBox.animate()
                 .alpha(0f)
                 .translationY(-12 * resources.displayMetrics.density)
                 .setDuration(400)

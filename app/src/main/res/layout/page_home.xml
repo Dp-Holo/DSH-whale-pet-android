@@ -47,20 +47,34 @@
             android:layout_marginTop="8dp"
             android:text="@string/check_balance_now" />
 
-        <TextView
-            android:id="@+id/tv_balance"
+        <!-- 余额文字：主文字 #A2B4DD + 右下偏移的浅灰色副本（双层叠加） -->
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:gravity="center"
-            android:text="@string/balance_hint"
-            android:textColor="#A2B4DD"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:shadowColor="#C8C8C8"
-            android:shadowDx="3"
-            android:shadowDy="3"
-            android:shadowRadius="0" />
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:id="@+id/tv_balance_shadow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginStart="3dp"
+                android:layout_marginTop="3dp"
+                android:text="@string/balance_hint"
+                android:textColor="#C8C8C8"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_balance"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:text="@string/balance_hint"
+                android:textColor="#A2B4DD"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+        </FrameLayout>
 
         <!-- 启停 -->
         <LinearLayout

@@ -36,6 +36,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnOverlay: Button
     private lateinit var etApiKey: EditText
     private lateinit var tvBalance: TextView
+    private lateinit var tvBalanceShadow: TextView
 
     /** 底栏分页 */
     private lateinit var tabHome: TextView
@@ -64,6 +65,7 @@ class MainActivity : AppCompatActivity() {
         btnOverlay = findViewById(R.id.btn_overlay)
         etApiKey = findViewById(R.id.et_api_key)
         tvBalance = findViewById(R.id.tv_balance)
+        tvBalanceShadow = findViewById(R.id.tv_balance_shadow)
         llLines = findViewById(R.id.ll_lines)
 
         // 回填已保存的 key
@@ -112,9 +114,9 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
             Prefs.saveApiKey(this, key)
-            tvBalance.text = getString(R.string.balance_hint)
+            setBalanceText(getString(R.string.balance_hint))
             BalanceFetcher.fetchAsync(key) { text ->
-                runOnUiThread { tvBalance.text = text }
+                runOnUiThread { setBalanceText(text) }
             }
         }
 
@@ -289,6 +291,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun toast(resId: Int) {
         Toast.makeText(this, resId, Toast.LENGTH_SHORT).show()
+    }
+
+    /** 余额文字双层同步（主文字 + 右下偏移的浅灰副本）。 */
+    private fun setBalanceText(text: String) {
+        tvBalance.text = text
+        tvBalanceShadow.text = text
     }
 
     /** 轻量键值存储（API key 只存本机） */

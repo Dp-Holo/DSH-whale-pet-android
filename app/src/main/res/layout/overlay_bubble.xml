@@ -25,19 +25,33 @@
         android:visibility="invisible"
         android:text="..." />
 
-    <!-- 余额徽标（#A2B4DD，加粗；右下偏移一层浅灰色文字副本） -->
-    <TextView
-        android:id="@+id/badge_text"
+    <!-- 余额徽标：主文字 #A2B4DD，右下偏移一层浅灰色文字副本（双层叠加，
+         shadowRadius=0 在硬件加速下不绘制，故不用 shadow 实现） -->
+    <FrameLayout
+        android:id="@+id/badge_box"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:textColor="#A2B4DD"
-        android:textSize="12sp"
-        android:textStyle="bold"
-        android:shadowColor="#C8C8C8"
-        android:shadowDx="3"
-        android:shadowDy="3"
-        android:shadowRadius="0"
-        android:visibility="invisible"
-        android:text="余额 --" />
+        android:visibility="invisible">
+
+        <TextView
+            android:id="@+id/badge_shadow_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="3dp"
+            android:layout_marginTop="3dp"
+            android:text="余额 --"
+            android:textColor="#C8C8C8"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/badge_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="余额 --"
+            android:textColor="#A2B4DD"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </FrameLayout>
 </LinearLayout>
