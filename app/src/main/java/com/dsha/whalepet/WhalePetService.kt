@@ -21,6 +21,8 @@ import android.widget.TextView
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -61,6 +63,9 @@ class WhalePetService : Service() {
     // 窗口内边距：本体居中绘制，四周留出缩放余量
     private val imgPad: Int
         get() = (windowPx - sizePx) / 2
+    /** 每帧基础速度（按密度换算，≈0.55 px/frame @1x） */
+    private val speedPx: Float
+        get() = 0.55f * resources.displayMetrics.density * 0.55f
     // 气泡/余额悬浮窗尺寸（宽度固定，高度内容自适应）
     private val bubbleW: Int
         get() = (240 * resources.displayMetrics.density).toInt()
@@ -222,8 +227,8 @@ class WhalePetService : Service() {
                 x += dx
                 y += dy
                 clamp()
-                overlayParams.x = x.toInt()
-                overlayParams.y = y.toInt()
+                overlayParams.x = x.roundToInt()
+                overlayParams.y = y.roundToInt()
                 wm.updateViewLayout(rootView, overlayParams)
                 if (bubbleVisible) positionBubbleWindow()
                 true
@@ -359,10 +364,9 @@ class WhalePetService : Service() {
 
     private fun stepWander() {
         if (dragging) return
-        val density = resources.displayMetrics.density
-        // 速度按密度换算到物理尺寸，≈0.55 px/frame（@3x 屏约 1.6px/帧），与 Web 版观感一致
-        val speed = 0.55f * density * 0.55f
-        angle += (Random.nextFloat() - 0.5f) * 0.06f
+        val speed = speedPx
+        // 随机偏转幅度收敛（原 0.06 → 0.03）：保留自然漫游感，减少视觉抖动
+        angle += (Random.nextFloat() - 0.5f) * 0.03f
         if (Random.nextFloat() < 0.0025f) {
             angle += (Random.nextFloat() - 0.5f) * (Math.PI / 2).toFloat()
         }
@@ -371,15 +375,17 @@ class WhalePetService : Service() {
         x += curVx
         y += curVy
         clamp()
-        overlayParams.x = x.toInt()
-        overlayParams.y = y.toInt()
+        // 四舍五入取整：避免亚像素累加被截断造成逐帧 ±1px 跳动
+        overlayParams.x = x.roundToInt()
+        overlayParams.y = y.roundToInt()
         wm.updateViewLayout(rootView, overlayParams)
         if (bubbleVisible) positionBubbleWindow()
-        // 朝向（带滞回：只有 |vx| 足够大且方向确实反转才翻转，杜绝过零抖动抽搐）
+        // 朝向：滞回阈值提高（0.2 → 0.35 倍速）+ 动画过渡，
+        // 杜绝速度在阈值附近抖动时朝向反复翻转造成的闪烁
         val wantFacing = if (curVx < 0) 1f else -1f
-        if (abs(curVx) > speed * 0.2f && wantFacing != facing) {
+        if (abs(curVx) > speed * 0.35f && wantFacing != facing) {
             facing = wantFacing
-            whaleImg.scaleX = facing
+            whaleImg.animate().scaleX(facing).setDuration(150).start()
         }
     }
 
@@ -390,11 +396,14 @@ class WhalePetService : Service() {
         // 窗口未使用 FLAG_LAYOUT_NO_LIMITS：坐标系即安全区（已排除状态栏／底部手势条），
         // 且系统会兜底约束窗口不越过导航栏，因此鲸鱼不会超出屏幕底部
         val maxY = dm.heightPixels - windowPx - edge
+        // 反弹时保证该轴有足够的反弹分量：接近水平游动时触底，curVy≈0，
+        // 单纯取反后仍是"贴着底边左右平移"；这里给至少半速的反弹分量
+        val minBounce = speedPx * 0.5f
         // 越界时反转对应轴速度（弹性反弹）并同步 angle，确保下一帧生效
-        if (x < edge) { x = edge.toFloat(); curVx = abs(curVx); syncAngle() }
-        if (x > maxX) { x = maxX.toFloat(); curVx = -abs(curVx); syncAngle() }
-        if (y < edge) { y = edge.toFloat(); curVy = abs(curVy); syncAngle() }
-        if (y > maxY) { y = maxY.toFloat(); curVy = -abs(curVy); syncAngle() }
+        if (x < edge) { x = edge.toFloat(); curVx = max(abs(curVx), minBounce); syncAngle() }
+        if (x > maxX) { x = maxX.toFloat(); curVx = -max(abs(curVx), minBounce); syncAngle() }
+        if (y < edge) { y = edge.toFloat(); curVy = max(abs(curVy), minBounce); syncAngle() }
+        if (y > maxY) { y = maxY.toFloat(); curVy = -max(abs(curVy), minBounce); syncAngle() }
     }
 
     /** 由当前速度反算方向角，让 clamp 的反弹在下一帧生效。 */

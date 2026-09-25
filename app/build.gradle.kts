@@ -13,7 +13,7 @@ android {
         targetSdk = 35
         // CI（GitHub Actions）里取 run number 保证每次发版 versionCode 递增；本地构建回退 1
         versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toIntOrNull() ?: 1
-        versionName = "1.1.4"
+        versionName = "1.1.5"
     }
 
     // 正式签名：keystore 由 CI 从 Actions secrets 注入（KEYSTORE_PATH 等环境变量）；
