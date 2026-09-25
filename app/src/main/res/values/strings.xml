@@ -23,4 +23,16 @@
     <string name="auto_granted">已通过 Shizuku 自动授权</string>
     <string name="granting_overlay">正在通过 Shizuku 自动授权…</string>
     <string name="auto_grant_failed">Shizuku 自动授权未生效：%1$s</string>
+
+    <!-- 台词管理 -->
+    <string name="lines_title">台词管理</string>
+    <string name="lines_hint">单击鲸鱼娘时随机说一句，可自行增删改</string>
+    <string name="add_line_hint">添加台词</string>
+    <string name="edit_line_hint">编辑台词</string>
+    <string name="delete_line_title">删除台词</string>
+    <string name="delete_line_msg">确定删除「%1$s」吗？</string>
+    <string name="line_empty_warn">台词不能为空</string>
+    <string name="save">保存</string>
+    <string name="cancel">取消</string>
+    <string name="confirm_delete">删除</string>
 </resources>

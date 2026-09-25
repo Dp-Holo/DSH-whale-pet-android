@@ -6,15 +6,19 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.LayoutInflater
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 
 /**
- * 设置页：授予悬浮窗权限、填写 DeepSeek API Key、
- * 启动/停止桌宠服务。
+ * 设置页：授予悬浮窗权限、填写 DeepSeek API Key、启停桌宠、
+ * 以及台词管理（条目列表：✍️ 编辑 / ❌ 删除 / ➕ 添加，删除二次确认）。
  *
  * Shizuku 集成注意：binder 异步到达，授权结果经 Shizuku 专用监听回调，
  * 因此统一交给 ShizukuHelper.init() 处理；不再自行 pingBinder 一次了事，
@@ -28,6 +32,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var etApiKey: EditText
     private lateinit var tvBalance: TextView
 
+    /** 台词管理：当前编辑中的台词池（与本地存储同步）。 */
+    private lateinit var llLines: LinearLayout
+    private val lines = mutableListOf<String>()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -37,6 +45,7 @@ class MainActivity : AppCompatActivity() {
         btnOverlay = findViewById(R.id.btn_overlay)
         etApiKey = findViewById(R.id.et_api_key)
         tvBalance = findViewById(R.id.tv_balance)
+        llLines = findViewById(R.id.ll_lines)
 
         // 回填已保存的 key
         etApiKey.setText(Prefs.getApiKey(this))
@@ -90,10 +99,81 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // ── 台词管理 ────────────────────────────────────────────
+        lines.clear()
+        lines.addAll(WhaleLines.load(this))
+        renderLines()
+        findViewById<Button>(R.id.btn_add_line).setOnClickListener { showLineDialog(null) }
+
         // Shizuku：注册 binder 就绪/授权结果监听。binder 就绪后自动请求授权，
         // 已授权则直接自动授予悬浮窗 + 通知权限（免手动跳设置页）。
         ShizukuHelper.init(this) { ok, detail -> onShizukuResult(ok, detail) }
     }
+
+    // ── 台词管理实现 ─────────────────────────────────────────
+
+    /** 以条目形式渲染台词列表（每项右下角：✍️ 编辑 / ❌ 删除）。 */
+    private fun renderLines() {
+        llLines.removeAllViews()
+        val inflater = LayoutInflater.from(this)
+        lines.forEachIndexed { index, text ->
+            val item = inflater.inflate(R.layout.item_line, llLines, false)
+            item.findViewById<TextView>(R.id.line_text).text = text
+            item.findViewById<Button>(R.id.btn_edit_line).setOnClickListener { showLineDialog(index) }
+            item.findViewById<Button>(R.id.btn_del_line).setOnClickListener { confirmDeleteLine(index) }
+            llLines.addView(item)
+        }
+    }
+
+    /** 添加（index=null）或编辑（index=条目标号）台词。 */
+    private fun showLineDialog(index: Int?) {
+        val isEdit = index != null
+        val edit = EditText(this).apply {
+            setText(if (isEdit) lines[index!!] else "")
+            hint = getString(if (isEdit) R.string.edit_line_hint else R.string.add_line_hint)
+            setSelection(text.length)
+        }
+        val container = FrameLayout(this).apply {
+            val pad = (20 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad / 2, pad, 0)
+            addView(edit)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(if (isEdit) R.string.edit_line_hint else R.string.add_line_hint)
+            .setView(container)
+            .setPositiveButton(R.string.save) { _, _ ->
+                val text = edit.text.toString().trim()
+                if (text.isEmpty()) {
+                    toast(R.string.line_empty_warn)
+                } else {
+                    if (isEdit) lines[index!!] = text else lines.add(text)
+                    persistLines()
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    /** 删除台词：二次确认后生效。 */
+    private fun confirmDeleteLine(index: Int) {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.delete_line_title)
+            .setMessage(getString(R.string.delete_line_msg, lines[index]))
+            .setPositiveButton(R.string.confirm_delete) { _, _ ->
+                lines.removeAt(index)
+                persistLines()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    /** 保存到本机并刷新列表（桌宠服务每次说话都重新读取，无需重启即生效）。 */
+    private fun persistLines() {
+        WhaleLines.save(this, lines)
+        renderLines()
+    }
+
+    // ── Shizuku / 权限 ──────────────────────────────────────
 
     /** Shizuku 自动授权结果：成功刷新界面；失败显示真实原因（便于排查）。 */
     private fun onShizukuResult(ok: Boolean, detail: String) {

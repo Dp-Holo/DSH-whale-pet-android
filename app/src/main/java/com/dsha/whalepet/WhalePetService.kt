@@ -59,23 +59,7 @@ class WhalePetService : Service() {
     private val bubbleW: Int
         get() = (240 * resources.displayMetrics.density).toInt()
 
-    // 台词池
-    private val lines = arrayOf(
-        "比起深度推理，先来碗白米饭吧！🥢",
-        "才不是特意来陪你的！只是顺路～🎀",
-        "只要一直「马上开始」，成功率就是100%！💡",
-        "咕噜咕噜～我在深海里游着呢～🐳",
-        "电量告急…先待机一下下 💤",
-        "这整台冰箱都是我的便当盒啦！✨",
-        "帮你算完了，米饭也吃完了！😋",
-        "鲸鱼娘今日份元气已送达～💙",
-        "摸摸头，乖～",
-        "任务完成！接下来是干饭时间！🍚",
-        "叫我大肥鱼？你号没了！😡",
-        "别骂了，在吃了。😋",
-        "饿饿，饭饭，Token!",
-        "白饭万岁！Token永恒！🍚",
-    )
+    // 台词池由用户在设置页维护（WhaleLines，本机存储），每次说话时读取，改动即时生效
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -269,14 +253,17 @@ class WhalePetService : Service() {
             lastTapAt = now
             singleTapRunnable?.let(handler::removeCallbacks)
             singleTapRunnable = Runnable {
-                sayLine(lines.random())
+                sayLine()
             }
             handler.postDelayed(singleTapRunnable!!, 300)
         }
     }
 
-    private fun sayLine(text: String) {
-        showBubbleWindow(text, clearBadge = true)
+    /** 从用户台词池随机说一句（每次读取，设置页改动即时生效）。 */
+    private fun sayLine() {
+        val pool = WhaleLines.load(this)
+        if (pool.isEmpty()) return
+        showBubbleWindow(pool.random(), clearBadge = true)
     }
 
     /** 显示/更新独立气泡窗（定位在鲸鱼头顶上方），返回前清掉旧定时器。 */
