@@ -522,10 +522,10 @@ class WhalePetService : Service() {
      * 这里在距边界一定范围内持续施加很小的向内偏转，让它自然离开边缘。
      */
     private fun softRepel(minX: Float, minY: Float, maxX: Float, maxY: Float) {
-        val band = windowPx * 0.6f                        // 感知带宽度
+        val band = windowPx * 0.35f                       // 感知带宽度（过大会让鲸鱼不敢靠近边缘）
         if (band <= 0f) return
         val halfPi = (Math.PI / 2).toFloat()
-        val k = 0.06f                                     // 每帧最大偏转比例
+        val k = 0.03f                                     // 每帧最大偏转比例（过大会显得被"吸"住）
         var changed = false
 
         val tBottom = ((y - (maxY - band)) / band).coerceIn(0f, 1f)
