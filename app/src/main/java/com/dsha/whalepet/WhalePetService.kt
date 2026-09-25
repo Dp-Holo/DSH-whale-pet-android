@@ -473,7 +473,7 @@ class WhalePetService : Service() {
     private fun calibrateBounds() {
         appendDebugLine(
             "=== whale debug start v${packageManager.getPackageInfo(packageName, 0).versionName} ===\n",
-            truncate = true
+            truncate = false
         )
         overlayParams.alpha = 0f
         val probeX = 200
@@ -650,10 +650,12 @@ class WhalePetService : Service() {
         return r
     }
 
-    // ── 临时诊断（定位底部静止问题用，定位后可移除）──────────
+    // ── 运行时诊断（写入 Download/whale-debug.txt，便于问题追溯）──
+    // 自清除：文件接近 1MB 时自动清空重写，保证长期运行也不会无限膨胀。
     private var debugUri: Uri? = null
     private var debugTick = 0
-    private var debugLineCount = 0
+    private val DEBUG_MAX_BYTES = 1 * 1024 * 1024
+    private val DEBUG_FILE_NAME = "whale-debug.txt"
 
     /** 记录一行运行时状态到 Download/whale-debug.txt。 */
     private fun dumpDebug(tag: String) {
@@ -668,51 +670,71 @@ class WhalePetService : Service() {
                 "param=[${overlayParams.x},${overlayParams.y}] loc=[${loc[0]},${loc[1]}] " +
                 "xy=[${x.roundToInt()},${y.roundToInt()}] " +
                 "angle=${"%.3f".format(angle)} drag=$dragging\n"
-            // 行数上限：写满一轮后清空重写，避免长期运行时文件无限增长
-            val truncate = debugLineCount >= 5000
-            if (truncate) {
-                debugLineCount = 0
-            } else {
-                debugLineCount++
-            }
+            // 超过 1MB 上限则清空重写（自清除历史数据）
+            val truncate = currentDebugSize() + line.length > DEBUG_MAX_BYTES
             appendDebugLine(line, truncate = truncate)
         } catch (_: Throwable) {
         }
     }
 
-    /** 追加写入（MediaStore Downloads，Android 10+ 免权限）。 */
+    /** 诊断文件当前字节数（拿不到按 0 处理）。 */
+    private fun currentDebugSize(): Long {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return 0L
+        return try {
+            val uri = ensureDebugUri() ?: return 0L
+            contentResolver.query(uri, arrayOf(MediaStore.Downloads.SIZE), null, null, null)
+                ?.use { c -> if (c.moveToFirst()) c.getLong(0) else 0L } ?: 0L
+        } catch (_: Throwable) {
+            0L
+        }
+    }
+
+    /** 取回或创建诊断文件对应的 MediaStore uri。 */
+    private fun ensureDebugUri(): Uri? {
+        debugUri?.let { return it }
+        return try {
+            val cr = contentResolver
+            cr.query(
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                arrayOf(MediaStore.Downloads._ID),
+                "${MediaStore.Downloads.DISPLAY_NAME}=?",
+                arrayOf(DEBUG_FILE_NAME),
+                null
+            )?.use { c ->
+                if (c.moveToFirst()) {
+                    debugUri = ContentUris.withAppendedId(
+                        MediaStore.Downloads.EXTERNAL_CONTENT_URI, c.getLong(0)
+                    )
+                }
+            }
+            if (debugUri == null) {
+                val values = ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, DEBUG_FILE_NAME)
+                    put(MediaStore.Downloads.MIME_TYPE, "text/plain")
+                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                }
+                debugUri = cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            }
+            debugUri
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    /** 追加写入（MediaStore Downloads，Android 10+ 免权限）；truncate=true 时清空重写。 */
     private fun appendDebugLine(line: String, truncate: Boolean) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
         try {
-            val cr = contentResolver
-            if (debugUri == null || truncate) {
-                val name = "whale-debug.txt"
-                cr.query(
-                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-                    arrayOf(MediaStore.Downloads._ID),
-                    "${MediaStore.Downloads.DISPLAY_NAME}=?",
-                    arrayOf(name),
-                    null
-                )?.use { c ->
-                    if (c.moveToFirst()) {
-                        debugUri = ContentUris.withAppendedId(
-                            MediaStore.Downloads.EXTERNAL_CONTENT_URI, c.getLong(0)
-                        )
-                    }
+            val uri = ensureDebugUri() ?: return
+            contentResolver.openOutputStream(uri, if (truncate) "wt" else "wa")?.use { os ->
+                if (truncate) {
+                    os.write(
+                        "=== rolled over, history cleared (max 1MB) v${
+                            packageManager.getPackageInfo(packageName, 0).versionName
+                        } ===\n".toByteArray()
+                    )
                 }
-                if (debugUri == null) {
-                    val values = ContentValues().apply {
-                        put(MediaStore.Downloads.DISPLAY_NAME, name)
-                        put(MediaStore.Downloads.MIME_TYPE, "text/plain")
-                        put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                    }
-                    debugUri = cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                }
-            }
-            debugUri?.let { uri ->
-                cr.openOutputStream(uri, if (truncate) "wt" else "wa")?.use { os ->
-                    os.write(line.toByteArray())
-                }
+                os.write(line.toByteArray())
             }
         } catch (_: Throwable) {
         }
