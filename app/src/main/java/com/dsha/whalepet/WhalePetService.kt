@@ -420,25 +420,29 @@ class WhalePetService : Service() {
     }
 
     // ── 窗口可移动范围（安全区）────────────────────────────
-    // 说明：displayMetrics 与 overlay 窗口坐标语义不一致，且底部导航栏在
-    // 手势导航下高度可能是 0，导致边界算大 —— 窗口实际已被系统夹在底部，
-    // 位置变量却仍"在界内"，于是鲸鱼在底部完全不动、过一会儿才开始移动。
-    // 这里两条路取保守交集：
-    //   1) createWindowContext 拿到该 display 的真实 WindowMetrics + 系统栏 insets
-    //   2) 把窗口推到极值位置，用 getLocationOnScreen 读回系统夹取后的实测坐标
+    // 实测发现（whale-debug.txt）：overlay 窗口的坐标原点不在物理屏幕左上角，
+    // 而在状态栏下方 —— param.y 与 getLocationOnScreen().y 恒定相差一个状态栏
+    // 高度（该机为 162px）。若直接按物理屏幕算边界，底部会多出这一偏移量：
+    // 窗口已被系统夹住，位置变量却仍判定"在界内"，于是鲸鱼在底部完全静止
+    // 一段时间才恢复（正是用户看到的现象）。
+    // 处理：先实测该偏移 offset，再把物理安全区换算到 param 坐标。
     private var boundsReady = false
     private var boundMinX = 0
     private var boundMinY = 0
     private var boundMaxX = 0
     private var boundMaxY = 0
+    private var offsetX = 0
+    private var offsetY = 0
+    private var insetsBottomPx = 0
 
-    /** 用系统 API 计算安全区可移动范围（窗口左上角坐标范围）。 */
+    /** 用系统 API + 实测偏移，计算 param 坐标下的可移动范围。 */
     private fun computeSafeBounds() {
         val dm = resources.displayMetrics
         var left = 0
         var top = 0
         var right = dm.widthPixels
         var bottom = dm.heightPixels
+        insetsBottomPx = 0
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
                 val uiCtx = createWindowContext(
@@ -455,76 +459,69 @@ class WhalePetService : Service() {
                     top = b.top + ins.top
                     right = b.right - ins.right
                     bottom = b.bottom - ins.bottom
+                    insetsBottomPx = ins.bottom
                 }
             } catch (_: Throwable) {
-                // 不支持则沿用 displayMetrics
+                // 拿不到就沿用 displayMetrics
             }
-        } else {
-            val id = resources.getIdentifier("navigation_bar_height", "dimen", "android")
-            val nav = if (id > 0) resources.getDimensionPixelSize(id) else 0
-            bottom = dm.heightPixels - nav
         }
-        boundMinX = left
-        boundMinY = top
-        boundMaxX = right - windowPx
-        boundMaxY = bottom - windowPx
+        // 状态栏：insets 常常取不到；实测的坐标偏移量本身约等于状态栏高度
+        if (top <= 0 && offsetY > 0) top = offsetY
+        // 底部手势条/导航栏：insets 为 0 时用保守余量兜底，避免鲸鱼被小白条遮住
+        if (insetsBottomPx <= 0) bottom -= (24 * dm.density).toInt()
+        // 物理坐标 → param 坐标（减去坐标原点偏移）
+        boundMinX = left - offsetX
+        boundMinY = top - offsetY
+        boundMaxX = right - offsetX - windowPx
+        boundMaxY = bottom - offsetY - windowPx
     }
 
-    /** 自校准窗口可移动范围（校准期间窗口透明，避免闪烁）。 */
+    /**
+     * 校准：窗口先摆在中间位置，用 getLocationOnScreen 与 param 的差值求出
+     * 坐标系偏移，再据此换算可移动范围（校准期间窗口透明，避免闪烁）。
+     */
     private fun calibrateBounds() {
         appendDebugLine(
             "=== whale debug start v${packageManager.getPackageInfo(packageName, 0).versionName} ===\n",
             truncate = true
         )
-        // 先按系统 API 算一份基准边界
-        computeSafeBounds()
         overlayParams.alpha = 0f
-        overlayParams.x = -100000
-        overlayParams.y = -100000
+        val probeX = 200
+        val probeY = 600
+        overlayParams.x = probeX
+        overlayParams.y = probeY
         try {
             wm.updateViewLayout(rootView, overlayParams)
         } catch (_: Exception) {
+            computeSafeBounds()
             boundsReady = true
             return
         }
         rootView.postOnAnimation {
             val loc = IntArray(2)
             rootView.getLocationOnScreen(loc)
-            val measMinX = loc[0]
-            val measMinY = loc[1]
-            overlayParams.x = 100000
-            overlayParams.y = 100000
+            offsetX = loc[0] - probeX
+            offsetY = loc[1] - probeY
+            // 偏移量不应大于窗口尺寸，异常则视为无偏移
+            val limit = windowPx * 2
+            if (abs(offsetX) > limit || abs(offsetY) > limit) {
+                offsetX = 0
+                offsetY = 0
+            }
+            computeSafeBounds()
+            boundsReady = boundMaxX > boundMinX && boundMaxY > boundMinY
+            // 初始位置：右下角（与旧版观感一致）
+            val dm = resources.displayMetrics
+            x = (boundMaxX - (24 * dm.density).toInt()).toFloat()
+            y = (boundMaxY - (60 * dm.density).toInt()).toFloat()
+            overlayParams.x = x.roundToInt()
+            overlayParams.y = y.roundToInt()
+            overlayParams.alpha = 1f
             try {
                 wm.updateViewLayout(rootView, overlayParams)
             } catch (_: Exception) {
             }
-            rootView.postOnAnimation {
-                rootView.getLocationOnScreen(loc)
-                val measMaxX = loc[0]
-                val measMaxY = loc[1]
-                // 与实测取保守交集：任何一路偏大都会被另一路收住
-                boundMinX = maxOf(boundMinX, measMinX)
-                boundMinY = maxOf(boundMinY, measMinY)
-                boundMaxX = minOf(boundMaxX, measMaxX)
-                boundMaxY = minOf(boundMaxY, measMaxY)
-                if (boundMaxX <= boundMinX || boundMaxY <= boundMinY) {
-                    // 实测不可靠：退回纯 API 计算值
-                    computeSafeBounds()
-                }
-                boundsReady = boundMaxX > boundMinX && boundMaxY > boundMinY
-                // 初始位置：右下角（与旧版观感一致）
-                val dm = resources.displayMetrics
-                x = (boundMaxX - (24 * dm.density).toInt()).toFloat()
-                y = (boundMaxY - (60 * dm.density).toInt()).toFloat()
-                overlayParams.x = x.roundToInt()
-                overlayParams.y = y.roundToInt()
-                overlayParams.alpha = 1f
-                try {
-                    wm.updateViewLayout(rootView, overlayParams)
-                } catch (_: Exception) {
-                }
-                dumpDebug("calibrated")
-            }
+            dumpDebug("calibrated")
         }
     }
 
@@ -677,6 +674,7 @@ class WhalePetService : Service() {
             val dm = resources.displayMetrics
             val line = "t=${System.currentTimeMillis()} tag=$tag ready=$boundsReady " +
                 "dm=${dm.widthPixels}x${dm.heightPixels} " +
+                "off=[$offsetX,$offsetY] insB=$insetsBottomPx " +
                 "bounds=[$boundMinX,$boundMinY,$boundMaxX,$boundMaxY] " +
                 "param=[${overlayParams.x},${overlayParams.y}] loc=[${loc[0]},${loc[1]}] " +
                 "xy=[${x.roundToInt()},${y.roundToInt()}] " +
