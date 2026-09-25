@@ -4,13 +4,16 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.net.Uri
+import android.os.BatteryManager
 import android.os.Build
 import android.os.Environment
 import android.os.Handler
@@ -24,6 +27,7 @@ import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.roundToInt
@@ -48,6 +52,7 @@ class WhalePetService : Service() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var wanderRunnable: Runnable? = null
+    private var wanderRunning = false
     private var balanceRunnable: Runnable? = null
     private var badgeTimer: Runnable? = null
     private var bubbleTimer: Runnable? = null
@@ -83,21 +88,89 @@ class WhalePetService : Service() {
         wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         startForegroundCompat()
         buildOverlay()
-        scheduleWander()
+        startWander()
         scheduleBalance()
+        registerSystemReceivers()
+        scheduleBatteryWatch()
     }
 
     override fun onDestroy() {
-        wanderRunnable?.let(handler::removeCallbacks)
+        stopWander()
         balanceRunnable?.let(handler::removeCallbacks)
+        batteryWatchRunnable?.let(handler::removeCallbacks)
         badgeTimer?.let(handler::removeCallbacks)
         bubbleTimer?.let(handler::removeCallbacks)
+        try {
+            unregisterReceiver(batteryReceiver)
+            unregisterReceiver(screenReceiver)
+        } catch (_: Exception) {
+        }
         try {
             wm.removeView(rootView)
         } catch (_: Exception) {
         }
         hideBubbleWindow()
         super.onDestroy()
+    }
+
+    // ── 系统状态联动：低电量提示 / 息屏暂停游动 ────────────────
+    private var batteryLow = false
+    private var lastLowBatteryNotify = 0L
+    private var batteryWatchRunnable: Runnable? = null
+
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(c: Context?, intent: Intent?) {
+            val i = intent ?: return
+            val level = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = i.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+            val plugged = i.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+            val pct = if (scale > 0) level * 100 / scale else -1
+            batteryLow = pct in 0..20 && !plugged
+        }
+    }
+
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(c: Context?, intent: Intent?) {
+            when (intent?.action) {
+                // 息屏时停止游动省电，亮屏恢复
+                Intent.ACTION_SCREEN_OFF -> stopWander()
+                Intent.ACTION_SCREEN_ON -> startWander()
+            }
+        }
+    }
+
+    private fun registerSystemReceivers() {
+        ContextCompat.registerReceiver(
+            this,
+            batteryReceiver,
+            IntentFilter(Intent.ACTION_BATTERY_CHANGED),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        val screenFilter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_SCREEN_ON)
+        }
+        ContextCompat.registerReceiver(
+            this,
+            screenReceiver,
+            screenFilter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+    }
+
+    /** 每 30 秒检查一次电量；低于 20% 且未充电时提示一句（10 分钟内不重复）。 */
+    private fun scheduleBatteryWatch() {
+        batteryWatchRunnable = object : Runnable {
+            override fun run() {
+                val now = System.currentTimeMillis()
+                if (batteryLow && now - lastLowBatteryNotify > 10 * 60 * 1000L) {
+                    lastLowBatteryNotify = now
+                    showBubbleWindow(getString(R.string.low_battery_line), clearBadge = false)
+                }
+                handler.postDelayed(this, 30_000L)
+            }
+        }
+        handler.postDelayed(batteryWatchRunnable!!, 30_000L)
     }
 
     // ── 前台通知 ──────────────────────────────────────────────
@@ -367,7 +440,9 @@ class WhalePetService : Service() {
     }
 
     // ── 自主游动（角度制，防抖）───────────────────────────────
-    private fun scheduleWander() {
+    private fun startWander() {
+        if (wanderRunning) return
+        wanderRunning = true
         wanderRunnable = object : Runnable {
             override fun run() {
                 stepWander()
@@ -375,6 +450,13 @@ class WhalePetService : Service() {
             }
         }
         handler.postDelayed(wanderRunnable!!, 16L)
+    }
+
+    /** 暂停游动（息屏 / 服务销毁），避免无谓的动画与重绘。 */
+    private fun stopWander() {
+        wanderRunning = false
+        wanderRunnable?.let(handler::removeCallbacks)
+        wanderRunnable = null
     }
 
     private fun stepWander() {

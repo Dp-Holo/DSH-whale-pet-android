@@ -11,6 +11,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- 网络：查询 DeepSeek 余额 -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 电池优化白名单：无 Shizuku 时通过系统授权框申请 -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- API Key 存于本机 SharedPreferences；关闭备份防止 Key 随云备份/ADB 备份外泄 -->
     <application

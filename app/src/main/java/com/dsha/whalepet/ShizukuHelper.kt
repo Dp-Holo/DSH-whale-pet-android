@@ -214,6 +214,43 @@ object ShizukuHelper {
         }.start()
     }
 
+    // ── 电池优化白名单 ──────────────────────────────────────
+
+    /**
+     * 把本应用加入电池优化白名单（`dumpsys deviceidle whitelist +<pkg>`），
+     * 降低被系统后台清理的概率（桌宠长期常驻更稳）。以系统真实状态回报结果。
+     */
+    fun addToBatteryWhitelist(ctx: Context, onResult: (ok: Boolean, detail: String) -> Unit) {
+        val app = ctx.applicationContext
+        appPackage = app.packageName
+        if (isIgnoringBatteryOptimizations(app)) {
+            mainHandler.post { onResult(true, "已在电池优化白名单中") }
+            return
+        }
+        if (!isAvailable()) {
+            mainHandler.post { onResult(false, "Shizuku 不可用") }
+            return
+        }
+        Thread {
+            val detail = try {
+                runCommand("dumpsys", "deviceidle", "whitelist", "+" + app.packageName)
+            } catch (t: Throwable) {
+                "执行异常：${t.message ?: t.javaClass.simpleName}"
+            }
+            val ok = isIgnoringBatteryOptimizations(app)
+            Log.i(TAG, "battery whitelist ok=$ok detail=$detail")
+            mainHandler.post { onResult(ok, detail) }
+        }.start()
+    }
+
+    /** 是否已忽略电池优化（系统真实状态）。 */
+    fun isIgnoringBatteryOptimizations(ctx: Context): Boolean = try {
+        val pm = ctx.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        pm.isIgnoringBatteryOptimizations(ctx.packageName)
+    } catch (t: Throwable) {
+        false
+    }
+
     // ── 后台线程命令执行 ─────────────────────────────────────
 
     private var cachedBinder: IBinder? = null

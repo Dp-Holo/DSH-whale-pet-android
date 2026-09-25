@@ -39,18 +39,31 @@ class ShizukuCommandService : IShizukuCommand.Stub() {
         }
     }
 
-    /** 允许的命令：appops set <whale-pkg> SYSTEM_ALERT_WINDOW allow / pm grant <whale-pkg> POST_NOTIFICATIONS */
+    /**
+     * 允许的命令（白名单，目标包名必须属于本应用）：
+     *  - appops set <pkg> SYSTEM_ALERT_WINDOW allow
+     *  - pm grant <pkg> android.permission.POST_NOTIFICATIONS
+     *  - dumpsys deviceidle whitelist +<pkg>   （加入电池优化白名单）
+     */
     private fun isAllowed(args: Array<String>): Boolean {
-        if (args.size != 5) return false
-        val pkg = args[2]
-        if (!pkg.startsWith("com.dsha.whalepet")) return false
-        return when {
-            args[0] == "appops" && args[1] == "set" &&
-                args[3] == "SYSTEM_ALERT_WINDOW" && args[4] == "allow" -> true
-            args[0] == "pm" && args[1] == "grant" &&
-                args[3] == "android.permission.POST_NOTIFICATIONS" -> true
-            else -> false
+        if (args.size == 5) {
+            val pkg = args[2]
+            if (!pkg.startsWith("com.dsha.whalepet")) return false
+            return when {
+                args[0] == "appops" && args[1] == "set" &&
+                    args[3] == "SYSTEM_ALERT_WINDOW" && args[4] == "allow" -> true
+                args[0] == "pm" && args[1] == "grant" &&
+                    args[3] == "android.permission.POST_NOTIFICATIONS" -> true
+                else -> false
+            }
         }
+        if (args.size == 4) {
+            if (args[0] != "dumpsys" || args[1] != "deviceidle" || args[2] != "whitelist") return false
+            val target = args[3]
+            return target.startsWith("+") &&
+                target.removePrefix("+").startsWith("com.dsha.whalepet")
+        }
+        return false
     }
 
     override fun destroy() {

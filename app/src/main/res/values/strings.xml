@@ -40,4 +40,13 @@
     <string name="save">保存</string>
     <string name="cancel">取消</string>
     <string name="confirm_delete">删除</string>
+
+    <!-- 电池优化白名单 -->
+    <string name="battery_whitelist">加入电池优化白名单</string>
+    <string name="battery_whitelisted">已在电池优化白名单中</string>
+    <string name="battery_whitelist_failed">加入失败：%1$s</string>
+    <string name="battery_granting">正在通过 Shizuku 加入白名单…</string>
+
+    <!-- 电池状态联动 -->
+    <string name="low_battery_line">电量告急…先待机一下下 💤</string>
 </resources>

@@ -1,7 +1,9 @@
 package com.dsha.whalepet
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -16,6 +18,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.color.MaterialColors
@@ -31,9 +34,15 @@ import com.google.android.material.color.MaterialColors
  */
 class MainActivity : AppCompatActivity() {
 
+    private companion object {
+        /** 通知权限请求码（Android 13+ 运行时权限） */
+        const val REQ_NOTIF = 1002
+    }
+
     private lateinit var btnStart: Button
     private lateinit var btnStop: Button
     private lateinit var btnOverlay: Button
+    private lateinit var btnBattery: Button
     private lateinit var etApiKey: EditText
     private lateinit var tvBalance: TextView
 
@@ -62,6 +71,7 @@ class MainActivity : AppCompatActivity() {
         btnStart = findViewById(R.id.btn_start)
         btnStop = findViewById(R.id.btn_stop)
         btnOverlay = findViewById(R.id.btn_overlay)
+        btnBattery = findViewById(R.id.btn_battery)
         etApiKey = findViewById(R.id.et_api_key)
         tvBalance = findViewById(R.id.tv_balance)
         llLines = findViewById(R.id.ll_lines)
@@ -74,6 +84,30 @@ class MainActivity : AppCompatActivity() {
                 toast(R.string.overlay_granted)
             } else {
                 openOverlaySettings()
+            }
+        }
+
+        // 电池优化白名单：优先用 Shizuku 自动加入，否则走系统授权框
+        btnBattery.setOnClickListener {
+            if (ShizukuHelper.isIgnoringBatteryOptimizations(this)) {
+                toast(R.string.battery_whitelisted)
+            } else if (ShizukuHelper.isAvailable()) {
+                toast(R.string.battery_granting)
+                ShizukuHelper.addToBatteryWhitelist(this) { ok, detail ->
+                    if (ok) {
+                        toast(R.string.battery_whitelisted)
+                        refreshBatteryState()
+                    } else {
+                        Toast.makeText(
+                            this,
+                            getString(R.string.battery_whitelist_failed, detail),
+                            Toast.LENGTH_LONG
+                        ).show()
+                        openBatterySettings()
+                    }
+                }
+            } else {
+                openBatterySettings()
             }
         }
 
@@ -242,7 +276,21 @@ class MainActivity : AppCompatActivity() {
     private fun tryStartService() {
         val key = etApiKey.text.toString().trim()
         if (key.isNotBlank()) Prefs.saveApiKey(this, key)
+        requestNotificationPermissionIfNeeded()
         startServiceCompat()
+    }
+
+    /** Android 13+ 通知权限：无 Shizuku 的用户也要能授权（否则常驻通知不显示）。 */
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                REQ_NOTIF
+            )
+        }
     }
 
     override fun onResume() {
@@ -252,6 +300,7 @@ class MainActivity : AppCompatActivity() {
             ShizukuHelper.autoGrant(this) { ok, detail -> onShizukuResult(ok, detail) }
         }
         refreshOverlayState()
+        refreshBatteryState()
     }
 
     override fun onDestroy() {
@@ -266,6 +315,34 @@ class MainActivity : AppCompatActivity() {
         } else {
             btnOverlay.setText(R.string.grant_overlay)
             btnOverlay.isEnabled = true
+        }
+    }
+
+    /** 电池优化白名单按钮状态（已加入则显示为完成态）。 */
+    private fun refreshBatteryState() {
+        if (ShizukuHelper.isIgnoringBatteryOptimizations(this)) {
+            btnBattery.setText(R.string.battery_whitelisted)
+            btnBattery.isEnabled = false
+        } else {
+            btnBattery.setText(R.string.battery_whitelist)
+            btnBattery.isEnabled = true
+        }
+    }
+
+    /** 无 Shizuku 或自动加入失败时，跳系统电池优化授权框/列表。 */
+    private fun openBatterySettings() {
+        try {
+            startActivity(
+                Intent(
+                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:$packageName")
+                )
+            )
+        } catch (_: Throwable) {
+            try {
+                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            } catch (_: Throwable) {
+            }
         }
     }
 
