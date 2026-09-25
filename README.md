@@ -1,15 +1,15 @@
-# 🐳 鲸鱼娘桌宠（Android）
+# 鲸鱼娘桌宠（Android）
 
 DeepSeek 鲸鱼娘悬浮窗桌宠——独立的 Android 应用，浮在手机屏幕上自由游泳。
 
 ## 功能
 
-- 🏊 **自主游动**：角度制平滑漫游，碰边弹性反弹，朝向滞回无抽搐
-- 👆 **单击**：弹跳缩放 + 冒台词（14 句鲸鱼娘经典台词）
-- 👆👆 **双击**：查询 DeepSeek 开放平台余额，头顶 #A2B4DD 上浮渐隐 0.8s（阴影右下偏移）
-- 🖐 **拖动**：按住拖到任意位置，松手后继续游
-- ⏱ **余额自动刷新**：每 5 分钟一次
-- 🎨 **Material 3 动态取色**：Android 12+ 主界面自动跟随壁纸主题色
+- **自主游动**：角度制平滑漫游，碰边弹性反弹，朝向滞回无抽搐
+- **单击**：弹跳缩放 + 冒台词（14 句鲸鱼娘经典台词）
+- **双击**：查询 DeepSeek 开放平台余额，头顶 #A2B4DD 上浮渐隐 0.8s（阴影右下偏移）
+- **拖动**：按住拖到任意位置，松手后继续游
+- **余额自动刷新**：每 5 分钟一次
+- **Material 3 动态取色**：Android 12+ 主界面自动跟随壁纸主题色
 
 ## 权限自动授予（Shizuku）
 
@@ -21,7 +21,7 @@ DeepSeek 鲸鱼娘悬浮窗桌宠——独立的 Android 应用，浮在手机�
 
 无需手动跳系统设置页。Shizuku 不可用时回退手动授权。
 
-## 📦 下载
+## 下载
 
 - **正式版（推荐）**：前往 [Releases](https://github.com/Dp-Holo/DSH-whale-pet-android/releases) 下载最新 `whale-pet-release.apk`（正式签名，包名 `com.dsha.whalepet`）
 - **开发版**：GitHub Actions 每次构建产物（`whale-pet-apk` artifact，包名 `com.dsha.whalepet.debug`）
