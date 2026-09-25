@@ -4,14 +4,19 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
+import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.provider.MediaStore
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -400,6 +405,11 @@ class WhalePetService : Service() {
         overlayParams.y = y.roundToInt()
         wm.updateViewLayout(rootView, overlayParams)
         if (bubbleVisible) positionBubbleWindow()
+        // 临时诊断：每秒记录一行运行时状态
+        if (++debugTick >= 60) {
+            debugTick = 0
+            dumpDebug("tick")
+        }
         // 朝向：滞回阈值提高（0.2 → 0.35 倍速）+ 动画过渡，
         // 杜绝速度在阈值附近抖动时朝向反复翻转造成的闪烁
         val wantFacing = if (curVx < 0) 1f else -1f
@@ -462,6 +472,10 @@ class WhalePetService : Service() {
 
     /** 自校准窗口可移动范围（校准期间窗口透明，避免闪烁）。 */
     private fun calibrateBounds() {
+        appendDebugLine(
+            "=== whale debug start v${packageManager.getPackageInfo(packageName, 0).versionName} ===\n",
+            truncate = true
+        )
         // 先按系统 API 算一份基准边界
         computeSafeBounds()
         overlayParams.alpha = 0f
@@ -509,6 +523,7 @@ class WhalePetService : Service() {
                     wm.updateViewLayout(rootView, overlayParams)
                 } catch (_: Exception) {
                 }
+                dumpDebug("calibrated")
             }
         }
     }
@@ -569,6 +584,7 @@ class WhalePetService : Service() {
         if (bounced) {
             bounceBoostFrames = 25          // 撞边弹开后加速，弹得干脆
             applyAngle()
+            dumpDebug("bounce")
         }
 
         // 近边界软排斥：避免以接近水平的角度长期贴着边游动（看起来像滑行）
@@ -624,6 +640,7 @@ class WhalePetService : Service() {
             angle = normalizeAngle(target)
             bounceBoostFrames = 25          // 松手弹开同样提速，避免"被磁铁吸着"缓慢脱离
             applyAngle()
+            dumpDebug("kick")
         }
     }
 
@@ -646,6 +663,65 @@ class WhalePetService : Service() {
         while (r <= -Math.PI.toFloat()) r += twoPi
         while (r > Math.PI.toFloat()) r -= twoPi
         return r
+    }
+
+    // ── 临时诊断（定位底部静止问题用，定位后可移除）──────────
+    private var debugUri: Uri? = null
+    private var debugTick = 0
+
+    /** 记录一行运行时状态到 Download/whale-debug.txt。 */
+    private fun dumpDebug(tag: String) {
+        try {
+            val loc = IntArray(2)
+            rootView.getLocationOnScreen(loc)
+            val dm = resources.displayMetrics
+            val line = "t=${System.currentTimeMillis()} tag=$tag ready=$boundsReady " +
+                "dm=${dm.widthPixels}x${dm.heightPixels} " +
+                "bounds=[$boundMinX,$boundMinY,$boundMaxX,$boundMaxY] " +
+                "param=[${overlayParams.x},${overlayParams.y}] loc=[${loc[0]},${loc[1]}] " +
+                "xy=[${x.roundToInt()},${y.roundToInt()}] " +
+                "angle=${"%.3f".format(angle)} drag=$dragging boost=$bounceBoostFrames\n"
+            appendDebugLine(line, truncate = false)
+        } catch (_: Throwable) {
+        }
+    }
+
+    /** 追加写入（MediaStore Downloads，Android 10+ 免权限）。 */
+    private fun appendDebugLine(line: String, truncate: Boolean) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        try {
+            val cr = contentResolver
+            if (debugUri == null || truncate) {
+                val name = "whale-debug.txt"
+                cr.query(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    arrayOf(MediaStore.Downloads._ID),
+                    "${MediaStore.Downloads.DISPLAY_NAME}=?",
+                    arrayOf(name),
+                    null
+                )?.use { c ->
+                    if (c.moveToFirst()) {
+                        debugUri = ContentUris.withAppendedId(
+                            MediaStore.Downloads.EXTERNAL_CONTENT_URI, c.getLong(0)
+                        )
+                    }
+                }
+                if (debugUri == null) {
+                    val values = ContentValues().apply {
+                        put(MediaStore.Downloads.DISPLAY_NAME, name)
+                        put(MediaStore.Downloads.MIME_TYPE, "text/plain")
+                        put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                    }
+                    debugUri = cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                }
+            }
+            debugUri?.let { uri ->
+                cr.openOutputStream(uri, if (truncate) "wt" else "wa")?.use { os ->
+                    os.write(line.toByteArray())
+                }
+            }
+        } catch (_: Throwable) {
+        }
     }
 
     // ── 余额：5 分钟轮询 + 头顶上浮渐隐 0.8s ──────────────────
