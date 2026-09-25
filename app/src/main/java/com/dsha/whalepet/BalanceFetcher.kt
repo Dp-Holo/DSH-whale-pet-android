@@ -1,6 +1,5 @@
 package com.dsha.whalepet
 
-import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import org.json.JSONObject

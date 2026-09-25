@@ -72,9 +72,6 @@ object ShizukuHelper {
     /** Shizuku 可用（服务运行 + 已授权给本应用）。 */
     fun isAvailable(): Boolean = isShizukuRunning() && isGranted()
 
-    /** 服务运行但本应用还没授权。 */
-    fun needsPermissionRequest(): Boolean = isShizukuRunning() && !isGranted()
-
     /** 悬浮窗权限的系统真实状态。 */
     fun canDrawOverlay(ctx: Context): Boolean = try {
         Settings.canDrawOverlays(ctx)
