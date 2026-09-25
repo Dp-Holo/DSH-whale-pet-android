@@ -70,10 +70,6 @@ class WhalePetService : Service() {
     /** 每帧基础速度（按密度换算，≈0.55 px/frame @1x） */
     private val speedPx: Float
         get() = 0.55f * resources.displayMetrics.density * 0.55f
-
-    /** 弹开加速：剩余帧数与倍率（约 25 帧 ≈ 0.4 秒） */
-    private var bounceBoostFrames = 0
-    private val BOUNCE_BOOST = 3f
     // 气泡/余额悬浮窗尺寸（宽度固定，高度内容自适应）
     private val bubbleW: Int
         get() = (240 * resources.displayMetrics.density).toInt()
@@ -383,13 +379,7 @@ class WhalePetService : Service() {
 
     private fun stepWander() {
         if (dragging) return
-        // 弹开加速：撞边/松手弹开后短时间内提速，避免"慢慢被吸离边界"的黏滞感
-        val speed = if (bounceBoostFrames > 0) {
-            bounceBoostFrames--
-            speedPx * BOUNCE_BOOST
-        } else {
-            speedPx
-        }
+        val speed = speedPx
         // 随机偏转幅度收敛（0.06 → 0.02）：低速时最容易看出抖动，进一步平滑
         angle += (Random.nextFloat() - 0.5f) * 0.02f
         if (Random.nextFloat() < 0.0025f) {
@@ -405,8 +395,8 @@ class WhalePetService : Service() {
         overlayParams.y = y.roundToInt()
         wm.updateViewLayout(rootView, overlayParams)
         if (bubbleVisible) positionBubbleWindow()
-        // 临时诊断：每秒记录一行运行时状态
-        if (++debugTick >= 60) {
+        // 临时诊断：每约 30 秒记录一行（避免文件增长过快）
+        if (++debugTick >= 1800) {
             debugTick = 0
             dumpDebug("tick")
         }
@@ -579,7 +569,6 @@ class WhalePetService : Service() {
         }
 
         if (bounced) {
-            bounceBoostFrames = 25          // 撞边弹开后加速，弹得干脆
             applyAngle()
             dumpDebug("bounce")
         }
@@ -635,7 +624,6 @@ class WhalePetService : Service() {
         }
         if (target != null) {
             angle = normalizeAngle(target)
-            bounceBoostFrames = 25          // 松手弹开同样提速，避免"被磁铁吸着"缓慢脱离
             applyAngle()
             dumpDebug("kick")
         }
@@ -665,6 +653,7 @@ class WhalePetService : Service() {
     // ── 临时诊断（定位底部静止问题用，定位后可移除）──────────
     private var debugUri: Uri? = null
     private var debugTick = 0
+    private var debugLineCount = 0
 
     /** 记录一行运行时状态到 Download/whale-debug.txt。 */
     private fun dumpDebug(tag: String) {
@@ -678,8 +667,15 @@ class WhalePetService : Service() {
                 "bounds=[$boundMinX,$boundMinY,$boundMaxX,$boundMaxY] " +
                 "param=[${overlayParams.x},${overlayParams.y}] loc=[${loc[0]},${loc[1]}] " +
                 "xy=[${x.roundToInt()},${y.roundToInt()}] " +
-                "angle=${"%.3f".format(angle)} drag=$dragging boost=$bounceBoostFrames\n"
-            appendDebugLine(line, truncate = false)
+                "angle=${"%.3f".format(angle)} drag=$dragging\n"
+            // 行数上限：写满一轮后清空重写，避免长期运行时文件无限增长
+            val truncate = debugLineCount >= 5000
+            if (truncate) {
+                debugLineCount = 0
+            } else {
+                debugLineCount++
+            }
+            appendDebugLine(line, truncate = truncate)
         } catch (_: Throwable) {
         }
     }
