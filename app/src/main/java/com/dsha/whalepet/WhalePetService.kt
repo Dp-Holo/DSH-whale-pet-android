@@ -19,9 +19,7 @@ import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.TextView
 import kotlin.math.abs
-import kotlin.math.atan2
 import kotlin.math.cos
-import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
@@ -389,6 +387,14 @@ class WhalePetService : Service() {
         }
     }
 
+    /**
+     * 边界处理：越界时吸附到边界，并按镜面反射调整方向角。
+     *
+     * 出射角限制为距切线至少 30°（即反射角落在 ±60° 带内）：
+     * 入射角很平时（接近水平游动触底）如果只做等角反射，出射角也很平，
+     * 鲸鱼会贴着底边横向滑行、看起来逐渐静止，直到随机扰动累积够大才猛地弹起。
+     * 限制出射角后每次触边都会以自然但不拖沓的角度明确弹开。
+     */
     private fun clamp() {
         val dm = resources.displayMetrics
         val edge = (2 * dm.density).toInt()          // 几乎贴边
@@ -396,19 +402,60 @@ class WhalePetService : Service() {
         // 窗口未使用 FLAG_LAYOUT_NO_LIMITS：坐标系即安全区（已排除状态栏／底部手势条），
         // 且系统会兜底约束窗口不越过导航栏，因此鲸鱼不会超出屏幕底部
         val maxY = dm.heightPixels - windowPx - edge
-        // 反弹时保证该轴有足够的反弹分量：接近水平游动时触底，curVy≈0，
-        // 单纯取反后仍是"贴着底边左右平移"；这里给至少半速的反弹分量
-        val minBounce = speedPx * 0.5f
-        // 越界时反转对应轴速度（弹性反弹）并同步 angle，确保下一帧生效
-        if (x < edge) { x = edge.toFloat(); curVx = max(abs(curVx), minBounce); syncAngle() }
-        if (x > maxX) { x = maxX.toFloat(); curVx = -max(abs(curVx), minBounce); syncAngle() }
-        if (y < edge) { y = edge.toFloat(); curVy = max(abs(curVy), minBounce); syncAngle() }
-        if (y > maxY) { y = maxY.toFloat(); curVy = -max(abs(curVy), minBounce); syncAngle() }
+
+        val halfPi = (Math.PI / 2).toFloat()
+        val limit = (Math.PI / 3).toFloat()          // 60°
+        var bounced = false                          // 角部同时越界时只反射一次
+
+        if (x < edge) {                              // 撞左 → 向右
+            x = edge.toFloat()
+            if (!bounced) {
+                angle = normalizeAngle(Math.PI.toFloat() - angle).coerceIn(-limit, limit)
+                bounced = true
+            }
+        } else if (x > maxX) {                       // 撞右 → 向左
+            x = maxX.toFloat()
+            if (!bounced) {
+                val a = normalizeAngle(Math.PI.toFloat() - angle)
+                angle = if (a >= 0) {
+                    a.coerceIn(Math.PI.toFloat() - limit, Math.PI.toFloat())
+                } else {
+                    a.coerceIn(-Math.PI.toFloat(), -Math.PI.toFloat() + limit)
+                }
+                bounced = true
+            }
+        }
+
+        if (y < edge) {                              // 撞顶 → 向下
+            y = edge.toFloat()
+            if (!bounced) {
+                angle = normalizeAngle(-angle).coerceIn(halfPi - limit, halfPi + limit)
+                bounced = true
+            }
+        } else if (y > maxY) {                       // 撞底 → 向上
+            y = maxY.toFloat()
+            if (!bounced) {
+                angle = normalizeAngle(-angle).coerceIn(-halfPi - limit, -halfPi + limit)
+                bounced = true
+            }
+        }
+
+        if (bounced) applyAngle()
     }
 
-    /** 由当前速度反算方向角，让 clamp 的反弹在下一帧生效。 */
-    private fun syncAngle() {
-        angle = atan2(curVy, curVx)
+    /** 由当前方向角重算速度分量（反弹后立即生效）。 */
+    private fun applyAngle() {
+        curVx = cos(angle.toDouble()).toFloat() * speedPx
+        curVy = sin(angle.toDouble()).toFloat() * speedPx
+    }
+
+    /** 把角度归一化到 (-π, π]。 */
+    private fun normalizeAngle(a: Float): Float {
+        val twoPi = (Math.PI * 2).toFloat()
+        var r = a
+        while (r <= -Math.PI.toFloat()) r += twoPi
+        while (r > Math.PI.toFloat()) r -= twoPi
+        return r
     }
 
     // ── 余额：5 分钟轮询 + 头顶上浮渐隐 0.8s ──────────────────
