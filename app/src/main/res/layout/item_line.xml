@@ -41,7 +41,7 @@
                 android:minHeight="0dp"
                 android:paddingLeft="10dp"
                 android:paddingRight="10dp"
-                android:text="✍️"
+                android:text="🖊"
                 android:textSize="16sp" />
 
             <Button

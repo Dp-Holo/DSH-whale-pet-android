@@ -24,9 +24,14 @@
     <string name="granting_overlay">正在通过 Shizuku 自动授权…</string>
     <string name="auto_grant_failed">Shizuku 自动授权未生效：%1$s</string>
 
+    <!-- 底栏与分页 -->
+    <string name="tab_home">设置</string>
+    <string name="tab_lines">台词管理</string>
+    <string name="home_hint">启动后鲸鱼娘会浮在屏幕上自由游泳\n单击说话 · 双击看余额 · 拖动换位置</string>
+
     <!-- 台词管理 -->
     <string name="lines_title">台词管理</string>
-    <string name="lines_hint">单击鲸鱼娘时随机说一句，可自行增删改</string>
+    <string name="lines_hint">单击鲸鱼娘时随机说一句；同一条说完后至少要隔两句才会再次出现</string>
     <string name="add_line_hint">添加台词</string>
     <string name="edit_line_hint">编辑台词</string>
     <string name="delete_line_title">删除台词</string>

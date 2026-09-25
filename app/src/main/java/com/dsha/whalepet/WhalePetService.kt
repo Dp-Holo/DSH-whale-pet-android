@@ -259,11 +259,28 @@ class WhalePetService : Service() {
         }
     }
 
+    /** 最近说过的台词（最多 2 条）：同一条至少要隔两句才会再次出现。 */
+    private val recentLines = ArrayDeque<String>()
+
     /** 从用户台词池随机说一句（每次读取，设置页改动即时生效）。 */
     private fun sayLine() {
         val pool = WhaleLines.load(this)
         if (pool.isEmpty()) return
-        showBubbleWindow(pool.random(), clearBadge = true)
+        showBubbleWindow(pickLine(pool), clearBadge = true)
+    }
+
+    /**
+     * 选下一句：在「不在最近 2 条内」的台词中随机；
+     * 台词池不足 3 条时无法完全避免，退化为全体随机。
+     */
+    private fun pickLine(pool: List<String>): String {
+        if (pool.size <= 1) return pool.first()
+        val blocked = recentLines.toSet()
+        val candidates = pool.filter { it !in blocked }
+        val chosen = if (candidates.isNotEmpty()) candidates.random() else pool.random()
+        recentLines.addLast(chosen)
+        while (recentLines.size > 2) recentLines.removeFirst()
+        return chosen
     }
 
     /** 显示/更新独立气泡窗（定位在鲸鱼头顶上方），返回前清掉旧定时器。 */

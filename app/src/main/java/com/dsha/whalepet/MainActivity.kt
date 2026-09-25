@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.LayoutInflater
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
@@ -15,10 +16,12 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.color.MaterialColors
 
 /**
- * 设置页：授予悬浮窗权限、填写 DeepSeek API Key、启停桌宠、
- * 以及台词管理（条目列表：✍️ 编辑 / ❌ 删除 / ➕ 添加，删除二次确认）。
+ * 主界面：底部导航栏分两页。
+ *  - 第一页（设置）：悬浮窗权限、DeepSeek API Key、启停桌宠
+ *  - 第二页（台词管理）：条目列表，🖊 编辑 / ❌ 删除（二次确认）/ ➕ 添加
  *
  * Shizuku 集成注意：binder 异步到达，授权结果经 Shizuku 专用监听回调，
  * 因此统一交给 ShizukuHelper.init() 处理；不再自行 pingBinder 一次了事，
@@ -31,6 +34,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnOverlay: Button
     private lateinit var etApiKey: EditText
     private lateinit var tvBalance: TextView
+
+    /** 底栏分页 */
+    private lateinit var tabHome: TextView
+    private lateinit var tabLines: TextView
 
     /** 台词管理：当前编辑中的台词池（与本地存储同步）。 */
     private lateinit var llLines: LinearLayout
@@ -99,20 +106,47 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // ── 台词管理 ────────────────────────────────────────────
+        // ── 台词管理（第二页）────────────────────────────────
         lines.clear()
         lines.addAll(WhaleLines.load(this))
         renderLines()
         findViewById<Button>(R.id.btn_add_line).setOnClickListener { showLineDialog(null) }
+
+        // ── 底栏分页：设置 / 台词管理 ────────────────────────
+        tabHome = findViewById(R.id.tab_home)
+        tabLines = findViewById(R.id.tab_lines)
+        tabHome.setOnClickListener { showPage(0) }
+        tabLines.setOnClickListener { showPage(1) }
+        showPage(0)
 
         // Shizuku：注册 binder 就绪/授权结果监听。binder 就绪后自动请求授权，
         // 已授权则直接自动授予悬浮窗 + 通知权限（免手动跳设置页）。
         ShizukuHelper.init(this) { ok, detail -> onShizukuResult(ok, detail) }
     }
 
+    // ── 底栏分页 ────────────────────────────────────────────
+
+    /** 切换页面：0=设置，1=台词管理。 */
+    private fun showPage(index: Int) {
+        findViewById<View>(R.id.page_home).visibility = if (index == 0) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.page_lines).visibility = if (index == 1) View.VISIBLE else View.GONE
+        styleTab(tabHome, index == 0)
+        styleTab(tabLines, index == 1)
+    }
+
+    private fun styleTab(tab: TextView, active: Boolean) {
+        val attr = if (active) {
+            com.google.android.material.R.attr.colorPrimary
+        } else {
+            com.google.android.material.R.attr.colorOnSurfaceVariant
+        }
+        tab.setTextColor(MaterialColors.getColor(tab, attr))
+        tab.alpha = if (active) 1f else 0.7f
+    }
+
     // ── 台词管理实现 ─────────────────────────────────────────
 
-    /** 以条目形式渲染台词列表（每项右下角：✍️ 编辑 / ❌ 删除）。 */
+    /** 以条目形式渲染台词列表（每项右下角：🖊 编辑 / ❌ 删除）。 */
     private fun renderLines() {
         llLines.removeAllViews()
         val inflater = LayoutInflater.from(this)
