@@ -15,7 +15,6 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
-import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.TextView
@@ -53,9 +52,15 @@ class WhalePetService : Service() {
     private var angle = -0.4f          // 初始方向（向左上）
     private var dragging = false
 
-    // 尺寸（0.8×：120dp → 96dp）；窗口 = 鲸鱼本体大小，可自由贴边
+    // 鲸鱼本体尺寸（0.8×：120dp → 96dp）
     private val sizePx: Int
         get() = (120 * 0.8f * resources.displayMetrics.density).toInt()
+    // 悬浮窗尺寸：比本体大 25%，给点击缩放（1.12×）留余量，避免放大时四周被窗口裁剪
+    private val windowPx: Int
+        get() = (sizePx * 1.25f).toInt()
+    // 窗口内边距：本体居中绘制，四周留出缩放余量
+    private val imgPad: Int
+        get() = (windowPx - sizePx) / 2
     // 气泡/余额悬浮窗尺寸（宽度固定，高度内容自适应）
     private val bubbleW: Int
         get() = (240 * resources.displayMetrics.density).toInt()
@@ -137,24 +142,28 @@ class WhalePetService : Service() {
     private var bubbleVisible = false
 
     private fun buildOverlay() {
-        val size = sizePx
+        val win = windowPx
         rootView = View.inflate(this, R.layout.overlay_whale, null)
         whaleImg = rootView.findViewById(R.id.whale_img)
+        // 本体在窗口内居中绘制，四周留出点击缩放余量
+        val pad = imgPad
+        whaleImg.setPadding(pad, pad, pad, pad)
 
         overlayParams = WindowManager.LayoutParams(
-            size,
-            size,
+            win,
+            win,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            // 不加 FLAG_LAYOUT_NO_LIMITS：交给系统把窗口约束在安全区内，
+            // 避免窗口被放进状态栏／底部手势条区域（NO_LIMITS 会允许超出屏幕边界）
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             // 初始位置：右下角
             val dm = resources.displayMetrics
-            x = dm.widthPixels - size - (24 * dm.density).toInt()
-            y = dm.heightPixels - size - (60 * dm.density).toInt()
+            x = dm.widthPixels - win - (24 * dm.density).toInt()
+            y = dm.heightPixels - win - (60 * dm.density).toInt()
         }
         whaleImg.setOnTouchListener(whaleTouch)
         wm.addView(rootView, overlayParams)
@@ -171,8 +180,7 @@ class WhalePetService : Service() {
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -312,13 +320,13 @@ class WhalePetService : Service() {
     private fun positionBubbleWindow() {
         val dm = resources.displayMetrics
         val bw = bubbleW
-        // 气泡窗中心对准鲸鱼中心
-        val centerX = x + sizePx / 2f
+        // 气泡窗中心对准鲸鱼中心（本体在窗口内居中）
+        val centerX = x + windowPx / 2f
         bubbleParams.x = (centerX - bw / 2f).toInt().coerceIn(0, dm.widthPixels - bw)
-        // 用实际内容高度（WRAP_CONTENT 布局后），气泡窗底部贴紧鲸鱼顶（留 3dp 间隙）
+        // 用实际内容高度（WRAP_CONTENT 布局后），气泡窗底部贴紧鲸鱼本体顶部（留 3dp 间隙）
         val contentH = if (bubbleWin.height > 0) bubbleWin.height
             else (60 * dm.density).toInt()
-        bubbleParams.y = (y - contentH - (3 * dm.density)).toInt()
+        bubbleParams.y = (y + imgPad - contentH - (3 * dm.density)).toInt()
             .coerceAtLeast(0)
         try {
             wm.updateViewLayout(bubbleWin, bubbleParams)
@@ -375,41 +383,13 @@ class WhalePetService : Service() {
         }
     }
 
-    /** 系统导航栏高度（手势条/三大键），悬浮窗被限制在其上方。 */
-    private fun navBarHeight(): Int {
-        val res = resources
-        val id = res.getIdentifier("navigation_bar_height", "dimen", "android")
-        return if (id > 0) res.getDimensionPixelSize(id) else 0
-    }
-
-    /**
-     * 底部系统栏真实高度（像素）。
-     *
-     * 优先用 WindowMetrics 的系统栏 insets：手势导航下
-     * `navigation_bar_height` 在部分 ROM（如 MIUI/HyperOS）返回 0，
-     * 窗口会一路贴到物理屏幕底部、被小白条盖住下半身；insets 才可靠。
-     */
-    private fun bottomSafeInset(): Int {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            try {
-                val wm = getSystemService(WindowManager::class.java)
-                val insets = wm.currentWindowMetrics.windowInsets.getInsetsIgnoringVisibility(
-                    WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()
-                )
-                if (insets.bottom > 0) return insets.bottom
-            } catch (_: Throwable) {
-                // 某些上下文不支持 WindowMetrics：回退传统方式
-            }
-        }
-        return navBarHeight()
-    }
-
     private fun clamp() {
         val dm = resources.displayMetrics
         val edge = (2 * dm.density).toInt()          // 几乎贴边
-        val maxX = dm.widthPixels - sizePx - edge
-        // 底端减去系统栏真实高度，鲸鱼完整显示在小白条/导航栏上方
-        val maxY = dm.heightPixels - sizePx - edge - bottomSafeInset()
+        val maxX = dm.widthPixels - windowPx - edge
+        // 窗口未使用 FLAG_LAYOUT_NO_LIMITS：坐标系即安全区（已排除状态栏／底部手势条），
+        // 且系统会兜底约束窗口不越过导航栏，因此鲸鱼不会超出屏幕底部
+        val maxY = dm.heightPixels - windowPx - edge
         // 越界时反转对应轴速度（弹性反弹）并同步 angle，确保下一帧生效
         if (x < edge) { x = edge.toFloat(); curVx = abs(curVx); syncAngle() }
         if (x > maxX) { x = maxX.toFloat(); curVx = -abs(curVx); syncAngle() }
