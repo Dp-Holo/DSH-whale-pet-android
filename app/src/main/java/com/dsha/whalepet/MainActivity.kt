@@ -6,7 +6,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -16,12 +15,12 @@ import androidx.appcompat.app.AppCompatActivity
 /**
  * 设置页：授予悬浮窗权限、填写 DeepSeek API Key、
  * 启动/停止桌宠服务。
+ *
+ * Shizuku 集成注意：binder 异步到达，授权结果经 Shizuku 专用监听回调，
+ * 因此统一交给 ShizukuHelper.init() 处理；不再自行 pingBinder 一次了事，
+ * 也不依赖 Activity.onRequestPermissionsResult（Shizuku 不走该通道）。
  */
 class MainActivity : AppCompatActivity() {
-
-    private companion object {
-        const val REQ_SHIZUKU = 1001
-    }
 
     private lateinit var btnStart: Button
     private lateinit var btnStop: Button
@@ -54,19 +53,19 @@ class MainActivity : AppCompatActivity() {
             if (!Settings.canDrawOverlays(this)) {
                 // 先尝试 Shizuku 自动授权，失败再跳手动设置
                 if (ShizukuHelper.isAvailable()) {
-                    ShizukuHelper.autoGrant(this) { ok ->
+                    toast(R.string.granting_overlay)
+                    ShizukuHelper.autoGrant(this) { ok, detail ->
                         if (ok) {
                             refreshOverlayState()
                             tryStartService()
                         } else {
-                            toast(R.string.grant_overlay)
+                            showGrantFailure(detail)
                             openOverlaySettings()
                         }
                     }
                 } else {
                     toast(R.string.grant_overlay)
                     openOverlaySettings()
-                    return@setOnClickListener
                 }
             } else {
                 tryStartService()
@@ -91,33 +90,26 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Shizuku：若可用则自动授予悬浮窗+通知权限（免手动跳设置页）
-        if (ShizukuHelper.needsPermissionRequest()) {
-            ShizukuHelper.requestPermission(REQ_SHIZUKU)
-        } else if (ShizukuHelper.isAvailable()) {
-            tryAutoGrant()
-        }
+        // Shizuku：注册 binder 就绪/授权结果监听。binder 就绪后自动请求授权，
+        // 已授权则直接自动授予悬浮窗 + 通知权限（免手动跳设置页）。
+        ShizukuHelper.init(this) { ok, detail -> onShizukuResult(ok, detail) }
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQ_SHIZUKU && ShizukuHelper.isAvailable()) {
-            tryAutoGrant()
-        }
-    }
-
-    /** 通过 Shizuku 自动授权并刷新按钮状态。 */
-    private fun tryAutoGrant() {
-        ShizukuHelper.autoGrant(this) { ok ->
+    /** Shizuku 自动授权结果：成功刷新界面；失败显示真实原因（便于排查）。 */
+    private fun onShizukuResult(ok: Boolean, detail: String) {
+        runOnUiThread {
             if (ok) {
                 toast(R.string.auto_granted)
                 refreshOverlayState()
+            } else if (ShizukuHelper.isShizukuRunning() && ShizukuHelper.isGranted()) {
+                // 已授权给本应用但自动授予仍未生效 → 命令层面失败，把 exit/err 显示出来
+                showGrantFailure(detail)
             }
         }
+    }
+
+    private fun showGrantFailure(detail: String) {
+        Toast.makeText(this, getString(R.string.auto_grant_failed, detail), Toast.LENGTH_LONG).show()
     }
 
     /** 保存 key 并启动桌宠服务。 */
@@ -129,11 +121,16 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // 从 Shizuku 授权/设置页返回后再次尝试自动授权
+        // 从 Shizuku 授权 / 系统设置页返回后重试一次
         if (ShizukuHelper.isAvailable() && !Settings.canDrawOverlays(this)) {
-            tryAutoGrant()
+            ShizukuHelper.autoGrant(this) { ok, detail -> onShizukuResult(ok, detail) }
         }
         refreshOverlayState()
+    }
+
+    override fun onDestroy() {
+        ShizukuHelper.release()
+        super.onDestroy()
     }
 
     private fun refreshOverlayState() {

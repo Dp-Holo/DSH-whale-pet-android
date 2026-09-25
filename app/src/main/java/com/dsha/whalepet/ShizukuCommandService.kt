@@ -21,6 +21,24 @@ class ShizukuCommandService : IShizukuCommand.Stub() {
         }
     }
 
+    /** 执行并回传退出码 + stdout/stderr，便于诊断授权失败的真实原因。 */
+    override fun run(args: Array<String>): String {
+        if (!isAllowed(args)) return "拒绝执行：命令不在白名单内"
+        return try {
+            val p = Runtime.getRuntime().exec(args)
+            val out = p.inputStream.bufferedReader().use { it.readText() }.trim()
+            val err = p.errorStream.bufferedReader().use { it.readText() }.trim()
+            val code = p.waitFor()
+            buildString {
+                append("exit=").append(code)
+                if (out.isNotEmpty()) append(" | out: ").append(out.take(200))
+                if (err.isNotEmpty()) append(" | err: ").append(err.take(200))
+            }
+        } catch (t: Throwable) {
+            "执行异常：${t.message ?: t.javaClass.simpleName}"
+        }
+    }
+
     /** 允许的命令：appops set <whale-pkg> SYSTEM_ALERT_WINDOW allow / pm grant <whale-pkg> POST_NOTIFICATIONS */
     private fun isAllowed(args: Array<String>): Boolean {
         if (args.size != 5) return false
