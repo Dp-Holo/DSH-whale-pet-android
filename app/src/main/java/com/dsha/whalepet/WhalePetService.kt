@@ -511,7 +511,7 @@ class WhalePetService : Service() {
         if (bounced) applyAngle()
 
         // 近边界软排斥：避免以接近水平的角度长期贴着边游动（看起来像滑行）
-        softRepel(minX, minY, maxX, maxY)
+        softRepel(minX.toFloat(), minY.toFloat(), maxX.toFloat(), maxY.toFloat())
     }
 
     /**
