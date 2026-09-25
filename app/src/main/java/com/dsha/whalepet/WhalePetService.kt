@@ -64,6 +64,10 @@ class WhalePetService : Service() {
     /** 每帧基础速度（按密度换算，≈0.55 px/frame @1x） */
     private val speedPx: Float
         get() = 0.55f * resources.displayMetrics.density * 0.55f
+
+    /** 弹开加速：剩余帧数与倍率（约 25 帧 ≈ 0.4 秒） */
+    private var bounceBoostFrames = 0
+    private val BOUNCE_BOOST = 3f
     // 气泡/余额悬浮窗尺寸（宽度固定，高度内容自适应）
     private val bubbleW: Int
         get() = (240 * resources.displayMetrics.density).toInt()
@@ -373,7 +377,13 @@ class WhalePetService : Service() {
 
     private fun stepWander() {
         if (dragging) return
-        val speed = speedPx
+        // 弹开加速：撞边/松手弹开后短时间内提速，避免"慢慢被吸离边界"的黏滞感
+        val speed = if (bounceBoostFrames > 0) {
+            bounceBoostFrames--
+            speedPx * BOUNCE_BOOST
+        } else {
+            speedPx
+        }
         // 随机偏转幅度收敛（0.06 → 0.02）：低速时最容易看出抖动，进一步平滑
         angle += (Random.nextFloat() - 0.5f) * 0.02f
         if (Random.nextFloat() < 0.0025f) {
@@ -512,7 +522,10 @@ class WhalePetService : Service() {
             }
         }
 
-        if (bounced) applyAngle()
+        if (bounced) {
+            bounceBoostFrames = 25          // 撞边弹开后加速，弹得干脆
+            applyAngle()
+        }
 
         // 近边界软排斥：避免以接近水平的角度长期贴着边游动（看起来像滑行）
         softRepel(minX.toFloat(), minY.toFloat(), maxX.toFloat(), maxY.toFloat())
@@ -529,7 +542,7 @@ class WhalePetService : Service() {
         val band = windowPx * 0.35f                       // 感知带宽度（过大会让鲸鱼不敢靠近边缘）
         if (band <= 0f) return
         val halfPi = (Math.PI / 2).toFloat()
-        val k = 0.03f                                     // 每帧最大偏转比例（过大会显得被"吸"住）
+        val k = 0.05f                                     // 每帧最大偏转比例（过大会显得被"吸"住）
         var changed = false
 
         val tBottom = ((y - (maxY - band)) / band).coerceIn(0f, 1f)
@@ -565,6 +578,7 @@ class WhalePetService : Service() {
         }
         if (target != null) {
             angle = normalizeAngle(target)
+            bounceBoostFrames = 25          // 松手弹开同样提速，避免"被磁铁吸着"缓慢脱离
             applyAngle()
         }
     }
