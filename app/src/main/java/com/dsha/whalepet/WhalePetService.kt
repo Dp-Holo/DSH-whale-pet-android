@@ -45,6 +45,12 @@ import kotlin.random.Random
  */
 class WhalePetService : Service() {
 
+    companion object {
+        /** 服务是否正在运行（供界面启停按钮显示对应文案）。 */
+        @Volatile
+        var isRunning: Boolean = false
+    }
+
     private lateinit var wm: WindowManager
     private lateinit var rootView: View
     private lateinit var overlayParams: WindowManager.LayoutParams
@@ -85,6 +91,7 @@ class WhalePetService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         startForegroundCompat()
         buildOverlay()
@@ -95,6 +102,7 @@ class WhalePetService : Service() {
     }
 
     override fun onDestroy() {
+        isRunning = false
         stopWander()
         balanceRunnable?.let(handler::removeCallbacks)
         batteryWatchRunnable?.let(handler::removeCallbacks)

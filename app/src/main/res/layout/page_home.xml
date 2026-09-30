@@ -58,34 +58,12 @@
             android:textSize="16sp"
             android:textStyle="bold" />
 
-        <!-- 启停 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/btn_start"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/start_service" />
-
-            <Button
-                android:id="@+id/btn_stop"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/stop_service" />
-        </LinearLayout>
-
         <!-- 电池优化白名单：防系统后台清理桌宠 -->
         <Button
             android:id="@+id/btn_battery"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="20dp"
             android:text="@string/battery_whitelist" />
 
         <!-- 通知设置：跳转系统通知页，可彻底关闭常驻通知 -->
@@ -95,6 +73,14 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:text="@string/notif_settings" />
+
+        <!-- 启停：合并为一个按钮，宽度与其他按钮一致，位于所有按钮最底部 -->
+        <Button
+            android:id="@+id/btn_toggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="@string/start_service" />
 
         <TextView
             android:layout_width="match_parent"

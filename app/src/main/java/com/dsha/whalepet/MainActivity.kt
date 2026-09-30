@@ -39,8 +39,7 @@ class MainActivity : AppCompatActivity() {
         const val REQ_NOTIF = 1002
     }
 
-    private lateinit var btnStart: Button
-    private lateinit var btnStop: Button
+    private lateinit var btnToggle: Button
     private lateinit var btnOverlay: Button
     private lateinit var btnBattery: Button
     private lateinit var etApiKey: EditText
@@ -68,8 +67,7 @@ class MainActivity : AppCompatActivity() {
             WindowInsetsCompat.CONSUMED
         }
 
-        btnStart = findViewById(R.id.btn_start)
-        btnStop = findViewById(R.id.btn_stop)
+        btnToggle = findViewById(R.id.btn_toggle)
         btnOverlay = findViewById(R.id.btn_overlay)
         btnBattery = findViewById(R.id.btn_battery)
         etApiKey = findViewById(R.id.et_api_key)
@@ -116,31 +114,34 @@ class MainActivity : AppCompatActivity() {
             openNotificationSettings()
         }
 
-        btnStart.setOnClickListener {
-            if (!Settings.canDrawOverlays(this)) {
-                // 先尝试 Shizuku 自动授权，失败再跳手动设置
-                if (ShizukuHelper.isAvailable()) {
-                    toast(R.string.granting_overlay)
-                    ShizukuHelper.autoGrant(this) { ok, detail ->
-                        if (ok) {
-                            refreshOverlayState()
-                            tryStartService()
-                        } else {
-                            showGrantFailure(detail)
-                            openOverlaySettings()
+        // 启停合并为一个按钮：未运行则启动（含权限检查），运行中则停止
+        btnToggle.setOnClickListener {
+            if (WhalePetService.isRunning) {
+                stopService(Intent(this, WhalePetService::class.java))
+                // 服务销毁是异步的，稍后刷新按钮文案
+                btnToggle.postDelayed({ refreshToggleState() }, 400)
+            } else {
+                if (!Settings.canDrawOverlays(this)) {
+                    // 先尝试 Shizuku 自动授权，失败再跳手动设置
+                    if (ShizukuHelper.isAvailable()) {
+                        toast(R.string.granting_overlay)
+                        ShizukuHelper.autoGrant(this) { ok, detail ->
+                            if (ok) {
+                                refreshOverlayState()
+                                tryStartService()
+                            } else {
+                                showGrantFailure(detail)
+                                openOverlaySettings()
+                            }
                         }
+                    } else {
+                        toast(R.string.grant_overlay)
+                        openOverlaySettings()
                     }
                 } else {
-                    toast(R.string.grant_overlay)
-                    openOverlaySettings()
+                    tryStartService()
                 }
-            } else {
-                tryStartService()
             }
-        }
-
-        btnStop.setOnClickListener {
-            stopService(Intent(this, WhalePetService::class.java))
         }
 
         // 立即查一次余额（复用服务里的查询逻辑）
@@ -283,6 +284,8 @@ class MainActivity : AppCompatActivity() {
         if (key.isNotBlank()) Prefs.saveApiKey(this, key)
         requestNotificationPermissionIfNeeded()
         startServiceCompat()
+        // 服务启动是异步的，稍后刷新按钮文案为「停止桌宠」
+        btnToggle.postDelayed({ refreshToggleState() }, 400)
     }
 
     /** Android 13+ 通知权限：无 Shizuku 的用户也要能授权（否则常驻通知不显示）。 */
@@ -306,6 +309,7 @@ class MainActivity : AppCompatActivity() {
         }
         refreshOverlayState()
         refreshBatteryState()
+        refreshToggleState()
     }
 
     override fun onDestroy() {
@@ -332,6 +336,11 @@ class MainActivity : AppCompatActivity() {
             btnBattery.setText(R.string.battery_whitelist)
             btnBattery.isEnabled = true
         }
+    }
+
+    /** 启停按钮文案随服务运行状态切换。 */
+    private fun refreshToggleState() {
+        btnToggle.setText(if (WhalePetService.isRunning) R.string.stop_service else R.string.start_service)
     }
 
     /** 无 Shizuku 或自动加入失败时，跳系统电池优化授权框/列表。 */
