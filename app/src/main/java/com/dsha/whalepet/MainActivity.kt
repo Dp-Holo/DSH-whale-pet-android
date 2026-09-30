@@ -317,22 +317,23 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
+    /** 悬浮窗权限按钮：已授予则从主界面隐藏。 */
     private fun refreshOverlayState() {
         if (Settings.canDrawOverlays(this)) {
-            btnOverlay.setText(R.string.overlay_granted)
-            btnOverlay.isEnabled = false
+            btnOverlay.visibility = View.GONE
         } else {
+            btnOverlay.visibility = View.VISIBLE
             btnOverlay.setText(R.string.grant_overlay)
             btnOverlay.isEnabled = true
         }
     }
 
-    /** 电池优化白名单按钮状态（已加入则显示为完成态）。 */
+    /** 电池白名单按钮：已加入则从主界面隐藏。 */
     private fun refreshBatteryState() {
         if (ShizukuHelper.isIgnoringBatteryOptimizations(this)) {
-            btnBattery.setText(R.string.battery_whitelisted)
-            btnBattery.isEnabled = false
+            btnBattery.visibility = View.GONE
         } else {
+            btnBattery.visibility = View.VISIBLE
             btnBattery.setText(R.string.battery_whitelist)
             btnBattery.isEnabled = true
         }

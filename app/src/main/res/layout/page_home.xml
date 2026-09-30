@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 第一页：桌宠设置（权限 / API Key / 启停） -->
+<!-- 第一页：桌宠设置（权限 / API Key / 启停）
+     权限类按钮（悬浮窗、电池白名单）相邻放在最上方，
+     已授予时由代码设为 GONE 隐藏，未授予才显示。 -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -22,19 +24,27 @@
             android:textSize="22sp"
             android:textStyle="bold" />
 
-        <!-- 悬浮窗权限 -->
+        <!-- 悬浮窗权限（已授予隐藏） -->
         <Button
             android:id="@+id/btn_overlay"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/grant_overlay" />
 
+        <!-- 电池优化白名单（已加入隐藏），与上一按钮相邻 -->
+        <Button
+            android:id="@+id/btn_battery"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/battery_whitelist" />
+
         <!-- API Key -->
         <EditText
             android:id="@+id/et_api_key"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="16dp"
             android:hint="@string/api_key_hint"
             android:importantForAutofill="no"
             android:inputType="textPassword" />
@@ -58,20 +68,12 @@
             android:textSize="16sp"
             android:textStyle="bold" />
 
-        <!-- 电池优化白名单：防系统后台清理桌宠 -->
-        <Button
-            android:id="@+id/btn_battery"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="@string/battery_whitelist" />
-
         <!-- 通知设置：跳转系统通知页，可彻底关闭常驻通知 -->
         <Button
             android:id="@+id/btn_notif_settings"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="20dp"
             android:text="@string/notif_settings" />
 
         <!-- 启停：合并为一个按钮，宽度与其他按钮一致，位于所有按钮最底部 -->
