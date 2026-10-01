@@ -48,6 +48,7 @@ class MainActivity : AppCompatActivity() {
     /** 底栏分页 */
     private lateinit var tabHome: TextView
     private lateinit var tabLines: TextView
+    private lateinit var tabSettings: TextView
 
     /** 台词管理：当前编辑中的台词池（与本地存储同步）。 */
     private lateinit var llLines: LinearLayout
@@ -164,12 +165,17 @@ class MainActivity : AppCompatActivity() {
         renderLines()
         findViewById<Button>(R.id.btn_add_line).setOnClickListener { showLineDialog(null) }
 
-        // ── 底栏分页：设置 / 台词管理 ────────────────────────
+        // ── 底栏分页：主页 / 台词管理 / 设置 ──────────────────
         tabHome = findViewById(R.id.tab_home)
         tabLines = findViewById(R.id.tab_lines)
+        tabSettings = findViewById(R.id.tab_settings)
         tabHome.setOnClickListener { showPage(0) }
         tabLines.setOnClickListener { showPage(1) }
+        tabSettings.setOnClickListener { showPage(2) }
         showPage(0)
+
+        // 关于鲸鱼娘桌宠（技术说明 + GitHub 链接）
+        findViewById<Button>(R.id.btn_about).setOnClickListener { showAbout() }
 
         // Shizuku：注册 binder 就绪/授权结果监听。binder 就绪后自动请求授权，
         // 已授权则直接自动授予悬浮窗 + 通知权限（免手动跳设置页）。
@@ -178,12 +184,14 @@ class MainActivity : AppCompatActivity() {
 
     // ── 底栏分页 ────────────────────────────────────────────
 
-    /** 切换页面：0=设置，1=台词管理。 */
+    /** 切换页面：0=主页，1=台词管理，2=设置。 */
     private fun showPage(index: Int) {
         findViewById<View>(R.id.page_home).visibility = if (index == 0) View.VISIBLE else View.GONE
         findViewById<View>(R.id.page_lines).visibility = if (index == 1) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.page_settings).visibility = if (index == 2) View.VISIBLE else View.GONE
         styleTab(tabHome, index == 0)
         styleTab(tabLines, index == 1)
+        styleTab(tabSettings, index == 2)
     }
 
     private fun styleTab(tab: TextView, active: Boolean) {
@@ -378,6 +386,28 @@ class MainActivity : AppCompatActivity() {
                 )
             } catch (_: Throwable) {
             }
+        }
+    }
+
+    /** 关于对话框：技术说明 + GitHub 仓库入口。 */
+    private fun showAbout() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.about_title)
+            .setMessage(R.string.about_body)
+            .setPositiveButton(R.string.about_open_github) { _, _ -> openGithub() }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun openGithub() {
+        try {
+            startActivity(
+                Intent(
+                    Intent.ACTION_VIEW,
+                    Uri.parse("https://github.com/Dp-Holo/DSH-whale-pet-android")
+                )
+            )
+        } catch (_: Throwable) {
         }
     }
 
