@@ -49,6 +49,12 @@ class WhalePetService : Service() {
         /** 服务是否正在运行（供界面启停按钮显示对应文案）。 */
         @Volatile
         var isRunning: Boolean = false
+
+        /** 余额静默检测间隔：3 秒 */
+        private const val TOKEN_WATCH_INTERVAL_MS = 3_000L
+
+        /**「正在偷吃用户token...」显示节流：10 秒内最多一次 */
+        private const val TOKEN_NIBBLE_COOLDOWN_MS = 10_000L
     }
 
     private lateinit var wm: WindowManager
@@ -64,6 +70,7 @@ class WhalePetService : Service() {
     private var tokenWatchRunnable: Runnable? = null
     private var lastBalanceValue: Double? = null
     private var lastBalanceCurrency: String? = null
+    private var lastTokenNibbleAt = 0L
     private var debugTokenNoKey = false
     private var badgeTimer: Runnable? = null
     private var bubbleTimer: Runnable? = null
@@ -854,22 +861,23 @@ class WhalePetService : Service() {
         handler.postDelayed(balanceRunnable!!, 3000L)
     }
 
-    // ── 余额消耗检测：每 10 秒静默查询（结果不显示）───────────
+    // ── 余额消耗检测：每 3 秒静默查询（结果不显示）───────────
 
     /**
-     * 每 10 秒静默查一次余额：只用于比较，**不显示**查询结果。
+     * 每 3 秒静默查一次余额：只用于比较，**不显示**查询结果。
      * 当余额相比上一次**减少**时（币种需一致），自动冒一句
      * "正在偷吃用户token..."，显示路径与单击台词完全相同（头顶气泡 2.2s）。
+     * 该提示有 10 秒节流：10 秒内最多显示一次。
      * 余额本身的展示仍由 5 分钟轮询负责。
      */
     private fun scheduleTokenWatch() {
         tokenWatchRunnable = object : Runnable {
             override fun run() {
                 checkTokenChange()
-                handler.postDelayed(this, 10_000L)
+                handler.postDelayed(this, TOKEN_WATCH_INTERVAL_MS)
             }
         }
-        handler.postDelayed(tokenWatchRunnable!!, 10_000L)
+        handler.postDelayed(tokenWatchRunnable!!, TOKEN_WATCH_INTERVAL_MS)
     }
 
     private fun checkTokenChange() {
@@ -889,15 +897,22 @@ class WhalePetService : Service() {
                 val prev = lastBalanceValue
                 val prevCurrency = lastBalanceCurrency
                 val decreased = prev != null && prevCurrency == amount.currency && amount.value < prev
+                var shown = false
                 if (decreased) {
-                    // 仅"减少"触发；充值/持平不触发。自动冒台词，效果同单击
-                    showBubbleWindow(getString(R.string.token_nibble_line), clearBadge = true)
+                    // 仅"减少"触发；充值/持平不触发。10 秒内最多提示一次
+                    val now = System.currentTimeMillis()
+                    if (now - lastTokenNibbleAt >= TOKEN_NIBBLE_COOLDOWN_MS) {
+                        lastTokenNibbleAt = now
+                        shown = true
+                        showBubbleWindow(getString(R.string.token_nibble_line), clearBadge = true)
+                    }
                 }
                 // 诊断：仅在数值变化/首次/触发时记录，避免刷屏
                 if (prev == null || amount.value != prev || decreased) {
                     dumpDebug(
                         "tokenWatch: value=${amount.value} prev=${prev ?: -1.0} " +
-                            "cur=${amount.currency} prevCur=${prevCurrency ?: "-"} triggered=$decreased"
+                            "cur=${amount.currency} prevCur=${prevCurrency ?: "-"} " +
+                            "triggered=$decreased shown=$shown"
                     )
                 }
                 lastBalanceValue = amount.value
