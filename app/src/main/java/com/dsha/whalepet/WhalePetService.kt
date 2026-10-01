@@ -800,30 +800,71 @@ class WhalePetService : Service() {
     }
 
     /** 取回或创建诊断文件对应的 MediaStore uri。 */
+    /**
+     * 取回诊断文件 uri。
+     *
+     * 历史问题：旧实现按精确文件名查询，"查不到就新建"；而 MediaStore 遇到重名
+     * 会给新文件加 `(n)` 后缀，于是标准名永远查不到 → 每次服务启动都新建一个，
+     * Download 目录里堆积了 whale-debug.txt + whale-debug (1)…(13).txt。
+     *
+     * 现在：按前缀列出全部同名变体，只保留一个（优先标准名，其次最新），
+     * 其余全部删除；若保留的不是标准名则尝试改名回标准名，便于固定路径读取。
+     */
     private fun ensureDebugUri(): Uri? {
         debugUri?.let { return it }
         return try {
             val cr = contentResolver
+            val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+            val found = mutableListOf<Triple<Long, String, Long>>()   // (id, name, dateAdded)
             cr.query(
-                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-                arrayOf(MediaStore.Downloads._ID),
-                "${MediaStore.Downloads.DISPLAY_NAME}=?",
-                arrayOf(DEBUG_FILE_NAME),
+                collection,
+                arrayOf(
+                    MediaStore.Downloads._ID,
+                    MediaStore.Downloads.DISPLAY_NAME,
+                    MediaStore.Downloads.DATE_ADDED
+                ),
+                "${MediaStore.Downloads.DISPLAY_NAME} LIKE ?",
+                arrayOf("$DEBUG_FILE_NAME%"),
                 null
             )?.use { c ->
-                if (c.moveToFirst()) {
-                    debugUri = ContentUris.withAppendedId(
-                        MediaStore.Downloads.EXTERNAL_CONTENT_URI, c.getLong(0)
-                    )
+                while (c.moveToNext()) {
+                    val name = c.getString(1) ?: ""
+                    if (name.startsWith("whale-debug")) {
+                        found.add(Triple(c.getLong(0), name, c.getLong(2)))
+                    }
                 }
             }
-            if (debugUri == null) {
+            if (found.isEmpty()) {
                 val values = ContentValues().apply {
                     put(MediaStore.Downloads.DISPLAY_NAME, DEBUG_FILE_NAME)
                     put(MediaStore.Downloads.MIME_TYPE, "text/plain")
                     put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
                 }
-                debugUri = cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                debugUri = cr.insert(collection, values)
+            } else {
+                val keep = found.firstOrNull { it.second == DEBUG_FILE_NAME }
+                    ?: found.maxByOrNull { it.third }!!
+                // 删除其余重复文件（非本应用创建的系统会拒绝，忽略即可）
+                found.filter { it.first != keep.first }.forEach { (id, _, _) ->
+                    runCatching {
+                        cr.delete(ContentUris.withAppendedId(collection, id), null, null)
+                    }
+                }
+                val uri = ContentUris.withAppendedId(collection, keep.first)
+                if (keep.second != DEBUG_FILE_NAME) {
+                    // 尝试改回标准名，保证外部按固定路径能读到
+                    runCatching {
+                        cr.update(
+                            uri,
+                            ContentValues().apply {
+                                put(MediaStore.Downloads.DISPLAY_NAME, DEBUG_FILE_NAME)
+                            },
+                            null,
+                            null
+                        )
+                    }
+                }
+                debugUri = uri
             }
             debugUri
         } catch (_: Throwable) {
