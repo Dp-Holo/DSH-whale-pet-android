@@ -50,6 +50,9 @@
     <!-- 电池状态联动 -->
     <string name="low_battery_line">电量告急…先待机一下下 💤</string>
 
+    <!-- 余额被消耗时提示（每 10 秒静默检测，仅余额减少时触发） -->
+    <string name="token_nibble_line">正在偷吃用户token...</string>
+
     <!-- 通知设置 -->
     <string name="notif_settings">通知设置（可彻底关闭常驻通知）</string>
 </resources>

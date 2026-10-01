@@ -60,6 +60,10 @@ class WhalePetService : Service() {
     private var wanderRunnable: Runnable? = null
     private var wanderRunning = false
     private var balanceRunnable: Runnable? = null
+    // 余额消耗检测（每 10 秒静默查询，结果不显示）
+    private var tokenWatchRunnable: Runnable? = null
+    private var lastBalanceValue: Double? = null
+    private var lastBalanceCurrency: String? = null
     private var badgeTimer: Runnable? = null
     private var bubbleTimer: Runnable? = null
 
@@ -97,6 +101,7 @@ class WhalePetService : Service() {
         buildOverlay()
         startWander()
         scheduleBalance()
+        scheduleTokenWatch()
         registerSystemReceivers()
         scheduleBatteryWatch()
     }
@@ -105,6 +110,7 @@ class WhalePetService : Service() {
         isRunning = false
         stopWander()
         balanceRunnable?.let(handler::removeCallbacks)
+        tokenWatchRunnable?.let(handler::removeCallbacks)
         batteryWatchRunnable?.let(handler::removeCallbacks)
         badgeTimer?.let(handler::removeCallbacks)
         bubbleTimer?.let(handler::removeCallbacks)
@@ -845,6 +851,41 @@ class WhalePetService : Service() {
             }
         }
         handler.postDelayed(balanceRunnable!!, 3000L)
+    }
+
+    // ── 余额消耗检测：每 10 秒静默查询（结果不显示）───────────
+
+    /**
+     * 每 10 秒静默查一次余额：只用于比较，**不显示**查询结果。
+     * 当余额相比上一次**减少**时（币种需一致），自动冒一句
+     * "正在偷吃用户token..."，显示路径与单击台词完全相同（头顶气泡 2.2s）。
+     * 余额本身的展示仍由 5 分钟轮询负责。
+     */
+    private fun scheduleTokenWatch() {
+        tokenWatchRunnable = object : Runnable {
+            override fun run() {
+                checkTokenChange()
+                handler.postDelayed(this, 10_000L)
+            }
+        }
+        handler.postDelayed(tokenWatchRunnable!!, 10_000L)
+    }
+
+    private fun checkTokenChange() {
+        val key = MainActivity.Prefs.getApiKey(this)
+        if (key.isBlank()) return
+        BalanceFetcher.fetchAmountAsync(key) { amount ->
+            if (amount != null) {
+                val prev = lastBalanceValue
+                val prevCurrency = lastBalanceCurrency
+                if (prev != null && prevCurrency == amount.currency && amount.value < prev) {
+                    // 仅"减少"触发；充值/持平不触发。自动冒台词，效果同单击
+                    showBubbleWindow(getString(R.string.token_nibble_line), clearBadge = true)
+                }
+                lastBalanceValue = amount.value
+                lastBalanceCurrency = amount.currency
+            }
+        }
     }
 
     private fun showBalanceAsync() {
