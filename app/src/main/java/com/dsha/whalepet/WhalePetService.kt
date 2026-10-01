@@ -64,6 +64,7 @@ class WhalePetService : Service() {
     private var tokenWatchRunnable: Runnable? = null
     private var lastBalanceValue: Double? = null
     private var lastBalanceCurrency: String? = null
+    private var debugTokenNoKey = false
     private var badgeTimer: Runnable? = null
     private var bubbleTimer: Runnable? = null
 
@@ -873,14 +874,31 @@ class WhalePetService : Service() {
 
     private fun checkTokenChange() {
         val key = MainActivity.Prefs.getApiKey(this)
-        if (key.isBlank()) return
+        if (key.isBlank()) {
+            // 诊断：只提示一次，避免刷屏
+            if (!debugTokenNoKey) {
+                debugTokenNoKey = true
+                dumpDebug("tokenWatch: API Key 为空，跳过检测")
+            }
+            return
+        }
         BalanceFetcher.fetchAmountAsync(key) { amount ->
-            if (amount != null) {
+            if (amount == null) {
+                dumpDebug("tokenWatch: 查询失败（保持基准不变）")
+            } else {
                 val prev = lastBalanceValue
                 val prevCurrency = lastBalanceCurrency
-                if (prev != null && prevCurrency == amount.currency && amount.value < prev) {
+                val decreased = prev != null && prevCurrency == amount.currency && amount.value < prev
+                if (decreased) {
                     // 仅"减少"触发；充值/持平不触发。自动冒台词，效果同单击
                     showBubbleWindow(getString(R.string.token_nibble_line), clearBadge = true)
+                }
+                // 诊断：仅在数值变化/首次/触发时记录，避免刷屏
+                if (prev == null || amount.value != prev || decreased) {
+                    dumpDebug(
+                        "tokenWatch: value=${amount.value} prev=${prev ?: -1.0} " +
+                            "cur=${amount.currency} prevCur=${prevCurrency ?: "-"} triggered=$decreased"
+                    )
                 }
                 lastBalanceValue = amount.value
                 lastBalanceCurrency = amount.currency
