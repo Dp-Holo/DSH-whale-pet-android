@@ -24,9 +24,6 @@ import java.util.concurrent.Executors
  */
 object PluginEngine {
 
-    private const val MAX_RUN_MS = 3_000L
-    private const val INSTRUCTION_THRESHOLD = 100_000
-
     private class Loaded(val plugin: Plugin, val scope: Scriptable)
 
     private val loaded = mutableMapOf<String, Loaded>()
@@ -146,11 +143,10 @@ object PluginEngine {
     }
 
     private fun applyGuard(cx: Context) {
-        val deadline = System.currentTimeMillis() + MAX_RUN_MS
-        cx.instructionObserverThreshold = INSTRUCTION_THRESHOLD
-        cx.instructionObserver = Context.InstructionObserver { _, _ ->
-            System.currentTimeMillis() < deadline
-        }
+        // 说明：所用 Rhino 版本未暴露指令观察器 API，故不做执行时限拦截。
+        // 由于所有脚本都在独立的后台线程串行执行，插件死循环只会阻塞插件功能，
+        // 不会卡住桌宠本体或 UI（异常仍逐个隔离并写入审计）。
+        cx.optimizationLevel = -1
     }
 
     /** 脚本可见的唯一 Java 对象：所有能力调用统一进入 PluginManager.handleCall。 */

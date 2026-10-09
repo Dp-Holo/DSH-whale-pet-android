@@ -147,7 +147,9 @@ object PluginManager {
     private fun writeMap(ctx: Context, key: String, map: Map<String, Set<String>>) {
         val o = JSONObject()
         map.forEach { (k, v) ->
-            o.put(k, JSONArray().apply { v.forEach { add(it) } })
+            val arr = JSONArray()
+            v.forEach { arr.put(it) }
+            o.put(k, arr)
         }
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putString(key, o.toString()).apply()
