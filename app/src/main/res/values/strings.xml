@@ -63,5 +63,33 @@
     <string name="about_entry">关于鲸鱼娘桌宠</string>
     <string name="about_title">关于鲸鱼娘桌宠 · 技术说明</string>
     <string name="about_open_github">打开 GitHub 仓库</string>
-    <string name="about_body">本项目由 DSHA（DeepSeek Harness Android）驱动 deepseek-v4-flash 模型编写并构建：需求拆解、代码实现、缺陷修复、CI 构建到 GitHub 发行，全流程由该模型完成。\n\n技术要点\n· Kotlin 2.0.20 + AGP 8.5.2，minSdk 26 / targetSdk 35，正式签名发布\n· 单 Activity + 前台服务（specialUse 类型）承载系统悬浮窗\n· 悬浮窗边界：WindowMetrics 安全区 + getLocationOnScreen 实测坐标偏移校准\n· 独立气泡／余额窗口与鲸鱼主窗口分离，互不干扰触摸与布局\n· 运动模型：角度制漫游 + 镜面反射（出射角限幅）+ 近边界软排斥\n· Shizuku UserService（AIDL + 命令白名单）免 root 授予权限，命令仅限本应用包名\n· 余额检测与展示分离：3 秒静默比对，5 分钟轮询展示\n· GitHub Actions 构建，签名密钥存于 Actions Secrets\n· 运行时诊断写入 Download/whale-debug.txt，超 1MB 自动清除历史\n\n代码许可 MIT · 鲸鱼娘立绘 CC BY-NC-SA 4.0\n仓库：https://github.com/Dp-Holo/DSH-whale-pet-android</string>
+    <string name="about_body">本项目由 DSHA（DeepSeek Harness Android）驱动 deepseek-v4-flash 模型编写并构建：需求拆解、代码实现、缺陷修复、CI 构建到 GitHub 发行，全流程由该模型完成。\n\n技术要点\n· Kotlin 2.0.20 + AGP 8.5.2，minSdk 26 / targetSdk 35，正式签名发布\n· 单 Activity + 前台服务（specialUse 类型）承载系统悬浮窗\n· 悬浮窗边界：WindowMetrics 安全区 + getLocationOnScreen 实测坐标偏移校准\n· 独立气泡／余额窗口与鲸鱼主窗口分离，互不干扰触摸与布局\n· 运动模型：角度制漫游 + 镜面反射（出射角限幅）+ 近边界软排斥\n· Shizuku UserService（AIDL + 命令白名单）免 root 授予权限，命令仅限本应用包名\n· 余额检测与展示分离：3 秒静默比对，5 分钟轮询展示\n· 插件系统：Rhino 脚本沙箱（唯一 Java 入口 + 能力授权 + 敏感二次确认 + 审计）\n· GitHub Actions 构建，签名密钥存于 Actions Secrets\n· 运行时诊断写入 Download/whale-debug.txt，超 1MB 自动清除历史\n\n代码许可 MIT · 鲸鱼娘立绘 CC BY-NC-SA 4.0\n仓库：https://github.com/Dp-Holo/DSH-whale-pet-android</string>
+
+    <!-- 插件 -->
+    <string name="plugins_entry">插件</string>
+    <string name="plugins_title">插件</string>
+    <string name="plugins_hint">脚本型插件（JS）：能力需授权，敏感操作每次确认，全部调用写入审计日志</string>
+    <string name="plugin_allow">允许</string>
+    <string name="plugin_deny">拒绝</string>
+    <string name="plugin_always_allow">始终允许</string>
+    <string name="plugin_confirm_title">插件请求敏感操作</string>
+    <string name="plugin_install_hint">粘贴插件 JSON</string>
+    <string name="plugin_install">安装</string>
+    <string name="plugin_install_sample">安装示例插件</string>
+    <string name="plugin_installed">已安装：%1$s</string>
+    <string name="plugin_install_failed">安装失败：JSON 格式不正确</string>
+    <string name="plugin_empty">暂无插件（可粘贴 JSON 或安装示例）</string>
+    <string name="plugin_authorize">授权</string>
+    <string name="plugin_authorized">已授权：%1$s</string>
+    <string name="plugin_delete_title">删除插件</string>
+    <string name="plugin_delete_msg">确定删除「%1$s」吗？</string>
+    <string name="plugin_enable">启用</string>
+    <string name="plugin_disable">停用</string>
+    <string name="plugin_revoke">撤销授权</string>
+    <string name="plugin_audit_log">审计日志：Download/whale-plugins.log</string>
+    <string name="plugin_state_on">已启用</string>
+    <string name="plugin_state_off">已停用</string>
+    <string name="plugin_caps_none">未声明能力</string>
+    <string name="plugin_notif_channel">插件通知</string>
+    <string name="plugin_confirm_format">插件「%1$s」请求执行敏感操作：\n%2$s</string>
 </resources>

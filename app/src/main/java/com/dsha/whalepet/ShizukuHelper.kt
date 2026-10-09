@@ -251,6 +251,23 @@ object ShizukuHelper {
         false
     }
 
+    /**
+     * 供插件调用的白名单命令执行（**须在后台线程调用**）。
+     *
+     * 命令仍由 UserService 侧的白名单校验，只有以本应用包名为目标的那几条能通过；
+     * 插件无法借此执行任意 shell。
+     */
+    fun execWhitelistedSync(ctx: Context, args: List<String>): String {
+        appPackage = ctx.packageName
+        if (!isAvailable()) return "Shizuku 不可用"
+        val binder = getServiceBinder() ?: return "无法绑定 UserService（Shizuku 未响应）"
+        return try {
+            IShizukuCommand.Stub.asInterface(binder).run(args.toTypedArray())
+        } catch (t: Throwable) {
+            "调用失败：${t.message ?: t.javaClass.simpleName}"
+        }
+    }
+
     // ── 后台线程命令执行 ─────────────────────────────────────
 
     private var cachedBinder: IBinder? = null

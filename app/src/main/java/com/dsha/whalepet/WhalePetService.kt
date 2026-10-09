@@ -19,12 +19,15 @@ import android.os.Environment
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.provider.MediaStore
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
+import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
@@ -55,6 +58,13 @@ class WhalePetService : Service() {
 
         /**「正在偷吃用户token...」显示节流：10 秒内最多一次 */
         private const val TOKEN_NIBBLE_COOLDOWN_MS = 10_000L
+
+        /** 插件通知渠道与通知 id */
+        private const val PLUGIN_CHANNEL_ID = "whale_plugin_channel"
+        private const val PLUGIN_NOTIF_ID = 2
+
+        /** 敏感操作确认超时（未选择视为拒绝） */
+        private const val CONFIRM_TIMEOUT_MS = 15_000L
     }
 
     private lateinit var wm: WindowManager
@@ -74,6 +84,14 @@ class WhalePetService : Service() {
     private var debugTokenNoKey = false
     private var badgeTimer: Runnable? = null
     private var bubbleTimer: Runnable? = null
+
+    // ── 插件宿主状态 ─────────────────────────────────────────
+    private lateinit var confirmWin: View
+    private lateinit var confirmParams: WindowManager.LayoutParams
+    private var confirmVisible = false
+    private var confirmTimeout: Runnable? = null
+    private var confirmCallback: ((Boolean, Boolean) -> Unit)? = null
+    private var wasBatteryLow = false
 
     // 漫游状态
     private var x = 0f
@@ -112,11 +130,18 @@ class WhalePetService : Service() {
         scheduleTokenWatch()
         registerSystemReceivers()
         scheduleBatteryWatch()
+        // 插件：预加载脚本并广播启动事件
+        PluginManager.preloadScripts(this, pluginHost)
+        handler.postDelayed({
+            PluginManager.dispatch(this, pluginHost, "appStart", "{}")
+        }, 1500L)
     }
 
     override fun onDestroy() {
         isRunning = false
         stopWander()
+        PluginEngine.shutdown()
+        dismissPluginConfirm(false)
         balanceRunnable?.let(handler::removeCallbacks)
         tokenWatchRunnable?.let(handler::removeCallbacks)
         batteryWatchRunnable?.let(handler::removeCallbacks)
@@ -135,6 +160,180 @@ class WhalePetService : Service() {
         super.onDestroy()
     }
 
+    // ── 插件宿主实现（能力执行 / 敏感确认）────────────────────
+    // 脚本在后台线程执行，因此这里的 UI/Activity 操作统一 post 回主线程。
+
+    private val pluginHost = object : PluginHost {
+        override fun pluginSay(text: String) {
+            if (text.isBlank()) return
+            handler.post { showBubbleWindow(text, clearBadge = true) }
+        }
+
+        override fun pluginNotify(title: String, text: String) {
+            handler.post {
+                try {
+                    val nm = getSystemService(NotificationManager::class.java)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        nm.createNotificationChannel(
+                            NotificationChannel(
+                                PLUGIN_CHANNEL_ID,
+                                getString(R.string.plugin_notif_channel),
+                                NotificationManager.IMPORTANCE_DEFAULT
+                            )
+                        )
+                    }
+                    val n = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        Notification.Builder(this@WhalePetService, PLUGIN_CHANNEL_ID)
+                            .setContentTitle(title.ifBlank { getString(R.string.app_name) })
+                            .setContentText(text)
+                            .setSmallIcon(R.drawable.ic_launcher_foreground)
+                            .build()
+                    } else {
+                        @Suppress("DEPRECATION")
+                        Notification.Builder(this@WhalePetService)
+                            .setContentTitle(title.ifBlank { getString(R.string.app_name) })
+                            .setContentText(text)
+                            .setSmallIcon(R.drawable.ic_launcher_foreground)
+                            .build()
+                    }
+                    nm.notify(PLUGIN_NOTIF_ID, n)
+                } catch (_: Throwable) {
+                }
+            }
+        }
+
+        override fun pluginVibrate(ms: Long) {
+            handler.post {
+                try {
+                    val v = getSystemService(Vibrator::class.java)
+                    val dur = ms.coerceIn(1L, 5000L)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        v.vibrate(VibrationEffect.createOneShot(dur, VibrationEffect.DEFAULT_AMPLITUDE))
+                    } else {
+                        @Suppress("DEPRECATION")
+                        v.vibrate(dur)
+                    }
+                } catch (_: Throwable) {
+                }
+            }
+        }
+
+        override fun pluginOpenUrl(url: String): Boolean {
+            val uri = try {
+                Uri.parse(url)
+            } catch (_: Throwable) {
+                return false
+            }
+            if (uri.scheme.isNullOrBlank()) return false
+            handler.post {
+                try {
+                    startActivity(
+                        Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                } catch (_: Throwable) {
+                }
+            }
+            return true
+        }
+
+        override fun pluginOpenApp(pkg: String): Boolean {
+            val intent = try {
+                packageManager.getLaunchIntentForPackage(pkg)
+            } catch (_: Throwable) {
+                null
+            } ?: return false
+            handler.post {
+                try {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(intent)
+                } catch (_: Throwable) {
+                }
+            }
+            return true
+        }
+
+        override fun pluginShizuku(args: List<String>): String = try {
+            // 白名单命令：只有以本应用包名为目标的那几条能通过 UserService 校验
+            ShizukuHelper.execWhitelistedSync(this@WhalePetService, args)
+        } catch (t: Throwable) {
+            "执行异常：${t.message ?: t.javaClass.simpleName}"
+        }
+
+        override fun pluginConfirm(
+            pluginName: String,
+            actionDesc: String,
+            onResult: (Boolean, Boolean) -> Unit
+        ) {
+            handler.post { showPluginConfirm(pluginName, actionDesc, onResult) }
+        }
+    }
+
+    // ── 敏感操作确认条（悬浮窗，15 秒未选择视为拒绝）──────────
+
+    private fun showPluginConfirm(
+        pluginName: String,
+        actionDesc: String,
+        onResult: (Boolean, Boolean) -> Unit
+    ) {
+        dismissPluginConfirm(false)
+        confirmCallback = onResult
+        try {
+            confirmWin = View.inflate(this, R.layout.overlay_plugin_confirm, null)
+            confirmWin.findViewById<TextView>(R.id.confirm_text).text =
+                getString(R.string.plugin_confirm_format, pluginName, actionDesc)
+            confirmWin.findViewById<Button>(R.id.confirm_allow).setOnClickListener {
+                finishPluginConfirm(true, false)
+            }
+            confirmWin.findViewById<Button>(R.id.confirm_always).setOnClickListener {
+                finishPluginConfirm(true, true)
+            }
+            confirmWin.findViewById<Button>(R.id.confirm_deny).setOnClickListener {
+                finishPluginConfirm(false, false)
+            }
+            val dm = resources.displayMetrics
+            confirmParams = WindowManager.LayoutParams(
+                dm.widthPixels - (24 * dm.density).toInt(),
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                PixelFormat.TRANSLUCENT
+            ).apply {
+                gravity = Gravity.BOTTOM or Gravity.START
+                x = (12 * dm.density).toInt()
+                y = (96 * dm.density).toInt()
+            }
+            wm.addView(confirmWin, confirmParams)
+            confirmVisible = true
+            confirmTimeout = Runnable { finishPluginConfirm(false, false) }
+            handler.postDelayed(confirmTimeout!!, CONFIRM_TIMEOUT_MS)
+        } catch (_: Throwable) {
+            confirmCallback = null
+            onResult(false, false)
+        }
+    }
+
+    /** 结束确认：移除确认条并回调结果（allowed=是否允许，remember=是否始终允许）。 */
+    private fun finishPluginConfirm(allowed: Boolean, remember: Boolean) {
+        val cb = confirmCallback
+        confirmCallback = null
+        confirmTimeout?.let(handler::removeCallbacks)
+        confirmTimeout = null
+        if (confirmVisible) {
+            try {
+                wm.removeView(confirmWin)
+            } catch (_: Exception) {
+            }
+            confirmVisible = false
+        }
+        cb?.invoke(allowed, remember)
+    }
+
+    private fun dismissPluginConfirm(deny: Boolean) {
+        if (confirmCallback != null || confirmVisible) {
+            finishPluginConfirm(false, false)
+        }
+    }
+
     // ── 系统状态联动：低电量提示 / 息屏暂停游动 ────────────────
     private var batteryLow = false
     private var lastLowBatteryNotify = 0L
@@ -148,6 +347,14 @@ class WhalePetService : Service() {
             val plugged = i.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
             val pct = if (scale > 0) level * 100 / scale else -1
             batteryLow = pct in 0..20 && !plugged
+            // 插件事件：刚进入低电状态时触发一次
+            if (batteryLow && !wasBatteryLow) {
+                PluginManager.dispatch(
+                    this@WhalePetService, pluginHost, "batteryLow",
+                    "{\"level\":$pct}"
+                )
+            }
+            wasBatteryLow = batteryLow
         }
     }
 
@@ -155,8 +362,14 @@ class WhalePetService : Service() {
         override fun onReceive(c: Context?, intent: Intent?) {
             when (intent?.action) {
                 // 息屏时停止游动省电，亮屏恢复
-                Intent.ACTION_SCREEN_OFF -> stopWander()
-                Intent.ACTION_SCREEN_ON -> startWander()
+                Intent.ACTION_SCREEN_OFF -> {
+                    stopWander()
+                    PluginManager.dispatch(this@WhalePetService, pluginHost, "screenOff", "{}")
+                }
+                Intent.ACTION_SCREEN_ON -> {
+                    startWander()
+                    PluginManager.dispatch(this@WhalePetService, pluginHost, "screenOn", "{}")
+                }
             }
         }
     }
@@ -378,12 +591,14 @@ class WhalePetService : Service() {
             // 双击：查余额
             singleTapRunnable?.let(handler::removeCallbacks)
             lastTapAt = 0
+            PluginManager.dispatch(this, pluginHost, "doubleTap", "{}")
             showBalanceAsync()
         } else {
             lastTapAt = now
             singleTapRunnable?.let(handler::removeCallbacks)
             singleTapRunnable = Runnable {
                 sayLine()
+                PluginManager.dispatch(this, pluginHost, "tap", "{}")
             }
             handler.postDelayed(singleTapRunnable!!, 300)
         }
@@ -940,6 +1155,11 @@ class WhalePetService : Service() {
                 val decreased = prev != null && prevCurrency == amount.currency && amount.value < prev
                 var shown = false
                 if (decreased) {
+                    // 插件事件：余额减少（与内置提示的节流相互独立）
+                    PluginManager.dispatch(
+                        this@WhalePetService, pluginHost, "balanceDecreased",
+                        "{\"value\":${amount.value},\"prev\":${prev ?: 0.0}}"
+                    )
                     // 仅"减少"触发；充值/持平不触发。10 秒内最多提示一次
                     val now = System.currentTimeMillis()
                     if (now - lastTokenNibbleAt >= TOKEN_NIBBLE_COOLDOWN_MS) {

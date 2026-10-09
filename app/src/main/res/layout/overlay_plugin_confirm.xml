@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 插件敏感操作确认条：允许 / 始终允许 / 拒绝 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="?attr/colorSurfaceVariant"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/confirm_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="13sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="end"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/confirm_deny"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="32dp"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"
+            android:text="@string/plugin_deny"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/confirm_always"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="32dp"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"
+            android:text="@string/plugin_always_allow"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/confirm_allow"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="32dp"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"
+            android:text="@string/plugin_allow"
+            android:textSize="12sp" />
+    </LinearLayout>
+</LinearLayout>
