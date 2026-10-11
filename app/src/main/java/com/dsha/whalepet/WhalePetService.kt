@@ -19,6 +19,7 @@ import android.os.Environment
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.provider.MediaStore
@@ -53,7 +54,7 @@ class WhalePetService : Service() {
         @Volatile
         var isRunning: Boolean = false
 
-        /** 余额静默检测间隔：3 秒 */
+        /** 余额静默检测间隔：3 秒（熄屏期间整体暂停，亮屏恢复） */
         private const val TOKEN_WATCH_INTERVAL_MS = 3_000L
 
         /**「正在偷吃用户token...」显示节流：10 秒内最多一次 */
@@ -364,10 +365,12 @@ class WhalePetService : Service() {
                 // 息屏时停止游动省电，亮屏恢复
                 Intent.ACTION_SCREEN_OFF -> {
                     stopWander()
+                    pauseBalanceWatch()
                     PluginManager.dispatch(this@WhalePetService, pluginHost, "screenOff", "{}")
                 }
                 Intent.ACTION_SCREEN_ON -> {
                     startWander()
+                    resumeBalanceWatch()
                     PluginManager.dispatch(this@WhalePetService, pluginHost, "screenOn", "{}")
                 }
             }
@@ -1106,6 +1109,10 @@ class WhalePetService : Service() {
         }
     }
 
+    /** 屏幕是否点亮：熄屏时不查询余额（省电、省流量），亮屏由广播恢复。 */
+    private fun isScreenOn(): Boolean =
+        (getSystemService(Context.POWER_SERVICE) as? PowerManager)?.isInteractive ?: true
+
     // ── 余额：5 分钟轮询 + 头顶上浮渐隐 0.8s ──────────────────
     private fun scheduleBalance() {
         balanceRunnable = object : Runnable {
@@ -1114,7 +1121,29 @@ class WhalePetService : Service() {
                 handler.postDelayed(this, 5 * 60 * 1000L)
             }
         }
-        handler.postDelayed(balanceRunnable!!, 3000L)
+        // 熄屏状态下启动服务时不发请求，等 ACTION_SCREEN_ON 再恢复
+        if (isScreenOn()) handler.postDelayed(balanceRunnable!!, 3000L)
+    }
+
+    /**
+     * 熄屏：暂停余额展示轮询与余额消耗检测。
+     * 两者都只是不发起网络请求，间隔本身不变（消耗检测仍是 3 秒）。
+     */
+    private fun pauseBalanceWatch() {
+        balanceRunnable?.let(handler::removeCallbacks)
+        tokenWatchRunnable?.let(handler::removeCallbacks)
+    }
+
+    /** 亮屏：恢复余额展示轮询与 3 秒消耗检测。 */
+    private fun resumeBalanceWatch() {
+        balanceRunnable?.let {
+            handler.removeCallbacks(it)
+            handler.postDelayed(it, 3000L)
+        }
+        tokenWatchRunnable?.let {
+            handler.removeCallbacks(it)
+            handler.postDelayed(it, TOKEN_WATCH_INTERVAL_MS)
+        }
     }
 
     // ── 余额消耗检测：每 3 秒静默查询（结果不显示）───────────
@@ -1125,6 +1154,7 @@ class WhalePetService : Service() {
      * "正在偷吃用户token..."，显示路径与单击台词完全相同（头顶气泡 2.2s）。
      * 该提示有 10 秒节流：10 秒内最多显示一次。
      * 余额本身的展示仍由 5 分钟轮询负责。
+     * 熄屏期间暂停发起请求（见 pauseBalanceWatch），亮屏恢复。
      */
     private fun scheduleTokenWatch() {
         tokenWatchRunnable = object : Runnable {
@@ -1133,7 +1163,8 @@ class WhalePetService : Service() {
                 handler.postDelayed(this, TOKEN_WATCH_INTERVAL_MS)
             }
         }
-        handler.postDelayed(tokenWatchRunnable!!, TOKEN_WATCH_INTERVAL_MS)
+        // 熄屏状态下启动服务时不发请求，等 ACTION_SCREEN_ON 再恢复
+        if (isScreenOn()) handler.postDelayed(tokenWatchRunnable!!, TOKEN_WATCH_INTERVAL_MS)
     }
 
     private fun checkTokenChange() {
