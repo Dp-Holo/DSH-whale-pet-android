@@ -132,8 +132,8 @@ object PluginManager {
         val f = fileOf(ctx, id) ?: return false
         return try {
             PluginEngine.unload(id)
-            f.delete()
             invalidateCache()
+            f.delete()                       // try 的值：删除是否成功
         } catch (_: Throwable) {
             false
         }
