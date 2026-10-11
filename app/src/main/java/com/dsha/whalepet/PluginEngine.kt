@@ -28,7 +28,7 @@ import java.util.concurrent.Executors
  */
 object PluginEngine {
 
-    private class Loaded(val plugin: Plugin, val scope: Scriptable)
+    private class Loaded(val plugin: Plugin, val scope: Scriptable, val scriptHash: Int)
 
     private val loaded = mutableMapOf<String, Loaded>()
 
@@ -118,6 +118,15 @@ object PluginEngine {
 
     fun isLoaded(pluginId: String): Boolean = loaded.containsKey(pluginId)
 
+    /**
+     * 已加载且脚本内容与当前一致？
+     *
+     * 只判断"是否加载过"会导致用户改了插件文件却不生效（必须停/开桌宠才行）。
+     * 这里比对脚本内容 hash：内容变了就返回 false，调用方会重新加载。
+     */
+    fun isLoadedFresh(pluginId: String, scriptHash: Int): Boolean =
+        loaded.containsKey(pluginId) && loaded[pluginId]?.scriptHash == scriptHash
+
     /** 异步加载（或重载）脚本插件；语法错误会写入审计。 */
     fun load(ctx: AppContext, plugin: Plugin, host: PluginHost) {
         if (!plugin.isScript) return
@@ -154,7 +163,7 @@ object PluginEngine {
                 cx.evaluateString(scope, GLUE_JS, "whale-glue", 1, null)
                 cx.evaluateString(scope, plugin.script, plugin.id, 1, null)
 
-                loaded[plugin.id] = Loaded(plugin, scope)
+                loaded[plugin.id] = Loaded(plugin, scope, plugin.script.hashCode())
                 PluginManager.audit(ctx, plugin.id, "load", "脚本已加载", "ok")
             } finally {
                 Context.exit()

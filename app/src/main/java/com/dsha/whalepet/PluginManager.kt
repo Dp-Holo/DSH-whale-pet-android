@@ -64,12 +64,33 @@ object PluginManager {
     fun files(ctx: Context): List<File> =
         dir(ctx).listFiles { f -> f.isFile && f.name.endsWith(".json") }?.toList() ?: emptyList()
 
-    fun loadAll(ctx: Context): List<Plugin> = files(ctx).mapNotNull { f ->
-        try {
-            Plugin.parse(f.readText())
-        } catch (_: Throwable) {
-            null
+    /** 插件列表缓存：事件触发时避免每次都读盘 + 解析 JSON（dispatch 在主线程调用）。 */
+    private var cache: List<Plugin>? = null
+    private var cacheStamp: Long = -1L
+
+    /** 插件目录的"最后修改时间"（用于让缓存随文件改动失效）。 */
+    private fun dirStamp(ctx: Context): Long =
+        dir(ctx).listFiles()?.maxOfOrNull { it.lastModified() } ?: 0L
+
+    /** 清空缓存（安装/启用/删除/文件被外部改动后调用）。 */
+    fun invalidateCache() {
+        cache = null
+        cacheStamp = -1L
+    }
+
+    fun loadAll(ctx: Context): List<Plugin> {
+        val stamp = dirStamp(ctx)
+        cache?.let { if (stamp == cacheStamp) return it }
+        val list = files(ctx).mapNotNull { f ->
+            try {
+                Plugin.parse(f.readText())
+            } catch (_: Throwable) {
+                null
+            }
         }
+        cache = list
+        cacheStamp = stamp
+        return list
     }
 
     private fun fileOf(ctx: Context, id: String): File? = files(ctx).firstOrNull { f ->
@@ -85,6 +106,8 @@ object PluginManager {
         val p = Plugin.parse(json) ?: return null
         return try {
             File(dir(ctx), "${p.id}.json").writeText(json)
+            invalidateCache()
+            PluginEngine.unload(p.id)          // 覆盖安装后强制重新加载
             p
         } catch (_: Throwable) {
             null
@@ -97,11 +120,8 @@ object PluginManager {
             val o = JSONObject(f.readText())
             o.put("enabled", enabled)
             f.writeText(o.toString(2))
-            if (enabled) {
-                Plugin.parse(o.toString())?.let { PluginEngine.unload(it.id) }
-            } else {
-                PluginEngine.unload(id)
-            }
+            invalidateCache()
+            PluginEngine.unload(id)            // 停用/启用都先卸载，启用时事件到来会自动重新加载
             true
         } catch (_: Throwable) {
             false
@@ -113,6 +133,7 @@ object PluginManager {
         return try {
             PluginEngine.unload(id)
             f.delete()
+            invalidateCache()
         } catch (_: Throwable) {
             false
         }
@@ -217,7 +238,8 @@ object PluginManager {
         val now = System.currentTimeMillis()
         loadAll(ctx).filter { it.enabled }.forEach { plugin ->
             if (plugin.isScript) {
-                if (!PluginEngine.isLoaded(plugin.id)) {
+                // 脚本内容变了（用户改了文件/覆盖安装）也要重新加载，否则改动不生效
+                if (!PluginEngine.isLoadedFresh(plugin.id, plugin.script.hashCode())) {
                     PluginEngine.load(ctx, plugin, host)
                 }
                 PluginEngine.fireEvent(ctx, plugin.id, event, payloadJson)

@@ -1,9 +1,14 @@
 name: Build APK
 
 # 触发：push 到 main 分支 + 手动触发（Actions 页面 Run workflow 按钮）
+# 纯文档改动不触发构建：否则会产出「同 versionName、不同 versionCode」的重复 APK，
+# 反而让用户难以区分版本（版本号规则：仅代码改动才升版本号）。
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   workflow_dispatch:
 
 jobs:

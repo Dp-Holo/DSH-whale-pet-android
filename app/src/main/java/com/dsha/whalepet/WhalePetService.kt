@@ -1041,8 +1041,10 @@ class WhalePetService : Service() {
                     MediaStore.Downloads.DISPLAY_NAME,
                     MediaStore.Downloads.DATE_ADDED
                 ),
-                "${MediaStore.Downloads.DISPLAY_NAME} LIKE ?",
-                arrayOf("$DEBUG_FILE_NAME%"),
+                // 只处理本应用自己创建的条目，避免误删用户手工做的同名备份
+                "${MediaStore.Downloads.DISPLAY_NAME} LIKE ? AND " +
+                    "${MediaStore.Downloads.OWNER_PACKAGE_NAME} = ?",
+                arrayOf("$DEBUG_FILE_NAME%", packageName),
                 null
             )?.use { c ->
                 while (c.moveToNext()) {

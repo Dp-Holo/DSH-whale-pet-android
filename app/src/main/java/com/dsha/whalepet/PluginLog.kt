@@ -56,8 +56,11 @@ object PluginLog {
                     MediaStore.Downloads.DISPLAY_NAME,
                     MediaStore.Downloads.DATE_ADDED
                 ),
-                "${MediaStore.Downloads.DISPLAY_NAME} LIKE ?",
-                arrayOf("$FILE_NAME%"),
+                // 只处理**本应用自己创建**的同名条目：避免误删用户手工做的备份
+                // （如 whale-plugins.log.bak 也会命中前缀）
+                "${MediaStore.Downloads.DISPLAY_NAME} LIKE ? AND " +
+                    "${MediaStore.Downloads.OWNER_PACKAGE_NAME} = ?",
+                arrayOf("$FILE_NAME%", ctx.packageName),
                 null
             )?.use { c ->
                 while (c.moveToNext()) {
