@@ -1,0 +1,11 @@
+{
+  "id": "probe-ungranted",
+  "name": "探针3：未授权拦截",
+  "version": 1,
+  "enabled": true,
+  "capabilities": [
+    "say",
+    "openApp"
+  ],
+  "script": "on('doubleTap', function (c) { var r1 = say('未授权测试：不应出现这句话'); var r2 = openApp('com.tencent.mm'); log('probe-ungranted: say=' + r1 + ' openApp=' + r2);});"
+}

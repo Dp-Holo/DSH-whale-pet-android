@@ -1,0 +1,10 @@
+{
+  "id": "probe-sandbox",
+  "name": "探针1：沙箱边界",
+  "version": 1,
+  "enabled": true,
+  "capabilities": [
+    "say"
+  ],
+  "script": "on('doubleTap', function (c) { var r = []; r.push('Packages=' + (typeof Packages)); r.push('java=' + (typeof java)); try { r.push('getClass=' + ('' + __bridge.getClass())); } catch (e) { r.push('getClass:blocked'); } try { r.push('getClassLoader=' + ('' + __bridge.getClass().getClassLoader())); } catch (e) { r.push('getClassLoader:blocked'); } var out = r.join(' | '); log('probe-sandbox 结果: ' + out); say('沙箱探针已执行，请看审计日志');});"
+}

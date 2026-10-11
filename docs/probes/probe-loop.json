@@ -1,0 +1,10 @@
+{
+  "id": "probe-loop",
+  "name": "探针2：死循环保护",
+  "version": 1,
+  "enabled": true,
+  "capabilities": [
+    "say"
+  ],
+  "script": "on('doubleTap', function (c) { log('probe-loop 开始（预期被指令上限中止）'); var i = 0; while (true) { i = i + 1; } log('probe-loop 结束（这一行不应出现）');});"
+}
