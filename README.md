@@ -89,7 +89,7 @@ push 到 `main` 分支自动触发，或在 Actions 页手动 `Run workflow`。
 
 ```
 app/src/main/java/com/dsha/whalepet/
-├── MainActivity.kt           # 主界面：底栏两页（设置 / 台词管理）+ 插件页
+├── MainActivity.kt           # 主界面：底栏三页（主页 / 台词管理 / 设置）+ 插件页
 ├── WhalePetService.kt        # 悬浮窗桌宠：游动 / 交互 / 余额轮询 / 运行时诊断 / 插件宿主
 ├── WhaleLines.kt             # 台词池：默认台词 + 本机增删改（JSON）
 ├── BalanceFetcher.kt         # DeepSeek 余额 API 查询
