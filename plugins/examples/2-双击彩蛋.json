@@ -1,0 +1,10 @@
+{
+  "id": "double-tap-egg",
+  "name": "双击彩蛋",
+  "version": 1,
+  "enabled": true,
+  "capabilities": [
+    "say"
+  ],
+  "script": "var lines = ['别点那么快嘛～', '再点我就生气了！', '咕噜咕噜～', '想看余额？人家知道啦']; on('doubleTap', function (c) { say(lines[Math.floor(Math.random() * lines.length)]); });"
+}

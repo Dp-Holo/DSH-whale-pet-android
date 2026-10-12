@@ -1,0 +1,11 @@
+{
+  "id": "balance-guard",
+  "name": "余额守卫",
+  "version": 1,
+  "enabled": true,
+  "capabilities": [
+    "say",
+    "notify"
+  ],
+  "script": "on('balanceDecreased', function (c) { var d = (c.prev - c.value); say('又消耗了 ' + d.toFixed(2) + ' 元…'); if (c.value < 1) { notify('余额不足', '只剩 ' + c.value.toFixed(2) + ' 元啦'); } });"
+}

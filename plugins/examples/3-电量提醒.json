@@ -1,0 +1,11 @@
+{
+  "id": "battery-alert",
+  "name": "电量提醒",
+  "version": 1,
+  "enabled": true,
+  "capabilities": [
+    "say",
+    "vibrate"
+  ],
+  "script": "on('batteryLow', function (c) { say('电量只剩 ' + c.level + '% 了…先待机一下下'); vibrate(300); });"
+}
