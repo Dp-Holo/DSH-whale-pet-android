@@ -21,6 +21,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.dsha.whalepet.plugin.PluginEntry
 import com.google.android.material.color.MaterialColors
 
 /**
@@ -37,18 +38,6 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         /** 通知权限请求码（Android 13+ 运行时权限） */
         const val REQ_NOTIF = 1002
-
-        /** 内置示例插件（脚本型，仅需 say 能力）。 */
-        val SAMPLE_PLUGIN_JSON = """
-            {
-              "id": "sample-starter",
-              "name": "示例：基础互动",
-              "version": 1,
-              "enabled": true,
-              "capabilities": ["say"],
-              "script": "on('balanceDecreased', function (c) { say('正在偷吃用户token...'); }); on('batteryLow', function (c) { say('电量告急…先待机一下下'); }); on('doubleTap', function (c) { say('别点那么快嘛～'); });"
-            }
-        """.trimIndent()
     }
 
     private lateinit var btnToggle: Button
@@ -189,140 +178,12 @@ class MainActivity : AppCompatActivity() {
         // 关于鲸鱼娘桌宠（技术说明 + GitHub 链接）
         findViewById<Button>(R.id.btn_about).setOnClickListener { showAbout() }
 
-        // 插件管理（脚本型：授权 / 启停 / 删除 / 审计）
-        findViewById<Button>(R.id.btn_plugins).setOnClickListener { showPluginsDialog() }
+        // 插件管理：交给插件宿主（兼容层入口，App 本体不关心界面实现）
+        findViewById<Button>(R.id.btn_plugins).setOnClickListener { PluginEntry.showManager(this) }
 
         // Shizuku：注册 binder 就绪/授权结果监听。binder 就绪后自动请求授权，
         // 已授权则直接自动授予悬浮窗 + 通知权限（免手动跳设置页）。
         ShizukuHelper.init(this) { ok, detail -> onShizukuResult(ok, detail) }
-    }
-
-    // ── 插件管理 ────────────────────────────────────────────
-
-    /** 插件列表：点击进入操作菜单；底部提供"安装示例/粘贴 JSON 安装"。 */
-    private fun showPluginsDialog() {
-        val plugins = PluginManager.loadAll(this)
-        val builder = AlertDialog.Builder(this)
-            .setTitle(R.string.plugins_title)
-            .setPositiveButton(R.string.plugin_install_sample) { _, _ -> installPluginJson(SAMPLE_PLUGIN_JSON) }
-            .setNeutralButton(R.string.plugin_install) { _, _ -> showPasteInstallDialog() }
-            .setNegativeButton(R.string.cancel, null)
-        if (plugins.isEmpty()) {
-            builder.setMessage(R.string.plugin_empty)
-        } else {
-            val items = plugins.map { p ->
-                val state = getString(if (p.enabled) R.string.plugin_state_on else R.string.plugin_state_off)
-                val caps = PluginManager.granted(this, p.id)
-                val capsText = if (caps.isEmpty()) {
-                    getString(R.string.plugin_caps_none)
-                } else {
-                    caps.joinToString("、") { PluginCaps.label(it) }
-                }
-                "${p.name}（$state）\n$capsText"
-            }.toTypedArray()
-            builder.setItems(items) { _, which -> showPluginActions(plugins[which]) }
-        }
-        builder.show()
-    }
-
-    /** 单个插件的操作：启用/停用、授权、撤销授权、删除。 */
-    private fun showPluginActions(p: Plugin) {
-        val actions = listOf(
-            getString(if (p.enabled) R.string.plugin_disable else R.string.plugin_enable),
-            getString(R.string.plugin_authorize),
-            getString(R.string.plugin_revoke),
-            getString(R.string.confirm_delete)
-        ).toTypedArray()
-        AlertDialog.Builder(this)
-            .setTitle(p.name)
-            .setItems(actions) { _, which ->
-                when (which) {
-                    0 -> {
-                        PluginManager.setEnabled(this, p.id, !p.enabled)
-                        toast(if (p.enabled) R.string.plugin_state_off else R.string.plugin_state_on)
-                    }
-                    1 -> authorizePlugin(p)
-                    2 -> {
-                        PluginManager.revokeAll(this, p.id)
-                        Toast.makeText(this, R.string.plugin_revoke, Toast.LENGTH_SHORT).show()
-                    }
-                    3 -> confirmDeletePlugin(p)
-                }
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
-
-    /** 能力授权：多选，敏感能力会标注"每次需确认"。 */
-    private fun authorizePlugin(p: Plugin) {
-        val caps = p.capabilities.toList()
-        if (caps.isEmpty()) {
-            Toast.makeText(this, R.string.plugin_caps_none, Toast.LENGTH_SHORT).show()
-            return
-        }
-        val labels = caps.map { cap ->
-            val sensitive = if (cap in PluginCaps.SENSITIVE) "（敏感：每次执行需确认）" else ""
-            PluginCaps.label(cap) + sensitive
-        }.toTypedArray()
-        val granted = PluginManager.granted(this, p.id)
-        val checked = BooleanArray(caps.size) { caps[it] in granted }
-        AlertDialog.Builder(this)
-            .setTitle(R.string.plugin_authorize)
-            .setMultiChoiceItems(labels, checked) { _, which, isChecked -> checked[which] = isChecked }
-            .setPositiveButton(R.string.save) { _, _ ->
-                val toGrant = caps.filterIndexed { i, _ -> checked[i] }
-                PluginManager.grant(this, p.id, toGrant)
-                val text = if (toGrant.isEmpty()) {
-                    getString(R.string.plugin_caps_none)
-                } else {
-                    toGrant.joinToString("、") { PluginCaps.label(it) }
-                }
-                Toast.makeText(this, getString(R.string.plugin_authorized, text), Toast.LENGTH_SHORT).show()
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
-
-    private fun confirmDeletePlugin(p: Plugin) {
-        AlertDialog.Builder(this)
-            .setTitle(R.string.plugin_delete_title)
-            .setMessage(getString(R.string.plugin_delete_msg, p.name))
-            .setPositiveButton(R.string.confirm_delete) { _, _ ->
-                PluginManager.delete(this, p.id)
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
-
-    /** 粘贴 JSON 安装插件。 */
-    private fun showPasteInstallDialog() {
-        val edit = EditText(this).apply {
-            hint = getString(R.string.plugin_install_hint)
-            minLines = 6
-            gravity = android.view.Gravity.TOP or android.view.Gravity.START
-        }
-        val container = FrameLayout(this).apply {
-            val pad = (20 * resources.displayMetrics.density).toInt()
-            setPadding(pad, pad / 2, pad, 0)
-            addView(edit)
-        }
-        AlertDialog.Builder(this)
-            .setTitle(R.string.plugins_title)
-            .setView(container)
-            .setPositiveButton(R.string.plugin_install) { _, _ -> installPluginJson(edit.text.toString()) }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
-
-    /** 安装插件 JSON：成功后立刻提示授权。 */
-    private fun installPluginJson(json: String) {
-        val p = PluginManager.install(this, json)
-        if (p == null) {
-            Toast.makeText(this, R.string.plugin_install_failed, Toast.LENGTH_LONG).show()
-            return
-        }
-        Toast.makeText(this, getString(R.string.plugin_installed, p.name), Toast.LENGTH_SHORT).show()
-        authorizePlugin(p)
     }
 
     // ── 底栏分页 ────────────────────────────────────────────

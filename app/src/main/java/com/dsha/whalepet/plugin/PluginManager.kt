@@ -1,4 +1,4 @@
-package com.dsha.whalepet
+package com.dsha.whalepet.plugin
 
 import android.content.Context
 import org.json.JSONArray
@@ -9,7 +9,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 插件宿主能力接口（由 WhalePetService 实现，全部在主线程调用）。
+ * 插件宿主能力接口（由本包 PluginHostImpl 实现；敏感确认走悬浮确认条）。
  *
  * 敏感动作的流程：插件调用 → handleCall 校验能力 → 未"始终允许"则调用
  * pluginConfirm 弹二次确认 → 用户允许后才执行 → 全程写入审计日志。

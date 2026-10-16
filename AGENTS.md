@@ -8,6 +8,23 @@
 Android 悬浮窗桌宠「鲸鱼娘桌宠」：Kotlin + 单 Activity + 前台服务（specialUse）承载系统悬浮窗；
 由 **DSHA（DeepSeek Harness Android）驱动 deepseek-v4-flash** 编写并构建。
 
+## 分工与目录归属（重要）
+
+本项目由**两个维护方**并行推进，**各改各的目录，不要交叉**：
+
+| 维护方 | 负责 | 目录 |
+|---|---|---|
+| **App 本体** | 悬浮窗/游动/交互、权限与 Shizuku、余额检测、台词、诊断、CI 与发布，以及**插件与 App 的兼容层** | `app/src/main/java/com/dsha/whalepet/*.kt`（不含 `plugin/`）、`res/`、`.github/` |
+| **插件宿主 + 插件内容** | 插件引擎与沙箱、能力授权、敏感确认、审计、插件管理界面、插件文件 | `app/src/main/java/com/dsha/whalepet/plugin/**`、`plugins/**`、`docs/PLUGIN_SPEC.md`、`docs/probes/**` |
+
+**两方之间只有三个接口**（改动接口需双方确认）：
+
+1. `PluginAppBridge` —— App 提供给插件的基础能力（say / notify / vibrate / openUrl / openApp / shizuku）
+2. `PluginEntry.onServiceStart / onServiceStop / onEvent` —— App 通知插件宿主（生命周期与事件）
+3. `PluginEntry.showManager(activity)` —— 设置页打开插件管理界面
+
+> 违反边界（例如直接改对方目录）会造成覆盖冲突；**动到宿主代码等于破坏插件安全模型**。
+
 ## 硬规则（不要违反）
 
 1. **构建只能走 GitHub Actions**

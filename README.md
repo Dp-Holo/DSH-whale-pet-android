@@ -88,19 +88,31 @@ push 到 `main` 分支自动触发，或在 Actions 页手动 `Run workflow`。
 ## 结构
 
 ```
-app/src/main/java/com/dsha/whalepet/
-├── MainActivity.kt           # 主界面：底栏三页（主页 / 台词管理 / 设置）+ 插件页
-├── WhalePetService.kt        # 悬浮窗桌宠：游动 / 交互 / 余额轮询 / 运行时诊断 / 插件宿主
+app/src/main/java/com/dsha/whalepet/          # App 本体
+├── MainActivity.kt           # 主界面：底栏三页（主页 / 台词管理 / 设置）
+├── WhalePetService.kt        # 悬浮窗桌宠：游动 / 交互 / 余额轮询 / 运行时诊断
 ├── WhaleLines.kt             # 台词池：默认台词 + 本机增删改（JSON）
 ├── BalanceFetcher.kt         # DeepSeek 余额 API 查询
 ├── WhalePetApp.kt            # Application：Material3 动态取色
 ├── ShizukuHelper.kt          # Shizuku 免 root 自动授权（异步 + 监听）
-├── ShizukuCommandService.kt  # Shizuku UserService：shell 身份执行白名单命令
+└── ShizukuCommandService.kt  # Shizuku UserService：shell 身份执行白名单命令
+
+app/src/main/java/com/dsha/whalepet/plugin/    # 插件宿主
+├── PluginAppBridge.kt        # 兼容层①：App 提供的基础能力接口
+├── PluginEntry.kt            # 兼容层②③：对 App 的唯一入口（生命周期 / 事件 / 管理界面）
 ├── Plugin.kt                 # 插件模型：能力声明 / 规则 / 脚本解析
 ├── PluginEngine.kt           # 脚本引擎：Rhino 沙箱（ClassShutter + 指令上限）
 ├── PluginManager.kt          # 能力授权 / 敏感二次确认 / 事件分发 / 审计
-└── PluginLog.kt              # 插件审计日志（MediaStore 写入 Download）
+├── PluginLog.kt              # 审计日志（MediaStore 写入 Download）
+├── PluginUi.kt               # 插件管理界面
+└── PluginConfirmOverlay.kt   # 敏感操作确认条
+
+plugins/                      # 插件源文件（示例见 plugins/examples/）
+docs/PLUGIN_SPEC.md           # 宿主能力契约（插件开发只看这一份）
+docs/probes/                  # 插件真机验证探针
 ```
+
+> 维护分工与接口约定见 [`AGENTS.md`](AGENTS.md)。
 
 ## 授权
 

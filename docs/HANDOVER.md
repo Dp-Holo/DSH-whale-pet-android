@@ -66,28 +66,49 @@
 
 ---
 
-## 4. 代码结构
+## 4. 代码结构与维护归属
+
+**两个维护方各改各的目录，不要交叉**（否则会互相覆盖）：
 
 ```
-app/src/main/java/com/dsha/whalepet/
-├── MainActivity.kt            # 主界面：底栏三页（主页 / 台词管理 / 设置）+ 插件管理对话框 + 关于
-├── WhalePetService.kt         # 前台服务：悬浮窗、漫游、交互、余额、状态联动、插件宿主、诊断
+app/src/main/java/com/dsha/whalepet/          ← 归「App 本体」维护方
+├── MainActivity.kt            # 主界面：底栏三页（主页 / 台词管理 / 设置）
+├── WhalePetService.kt         # 前台服务：悬浮窗、漫游、交互、余额、状态联动、诊断
 ├── WhaleLines.kt              # 台词池（本地 JSON）
 ├── BalanceFetcher.kt          # 余额查询：展示用 fetch() + 数值用 fetchAmountAsync()
 ├── WhalePetApp.kt             # Application（Material3 动态取色）
 ├── ShizukuHelper.kt           # Shizuku：binder 监听、授权、白名单命令执行
-├── ShizukuCommandService.kt   # Shizuku UserService（AIDL，命令白名单校验）
-├── Plugin.kt                  # 插件模型与 JSON 解析（能力/事件/动作）
-├── PluginEngine.kt            # Rhino 沙箱：__bridge 唯一 Java 入口、胶水 API、后台单线程执行
-│                              #   + ContextFactory / ClassShutter 白名单 + 指令上限（1.1.29 起）
-├── PluginManager.kt           # 插件：文件、能力授权、敏感确认调度、审计、事件分发
-└── PluginLog.kt               # 插件审计日志（MediaStore，1MB 自清除）
+└── ShizukuCommandService.kt   # Shizuku UserService（AIDL，命令白名单校验）
+
+app/src/main/java/com/dsha/whalepet/plugin/    ← 归「插件宿主」维护方
+├── PluginAppBridge.kt         # 【兼容层①】App 提供的基础能力接口（App 侧实现）
+├── PluginEntry.kt             # 【兼容层②③】唯一入口 + PluginHost 适配
+├── Plugin.kt                  # 插件模型与 JSON 解析
+├── PluginEngine.kt            # Rhino 沙箱（唯一 Java 入口 __bridge、ClassShutter、指令上限）
+├── PluginManager.kt           # 能力授权 / 敏感确认调度 / 审计 / 事件分发
+├── PluginLog.kt               # 审计日志（MediaStore，1MB 自清除）
+├── PluginUi.kt                # 插件管理界面
+└── PluginConfirmOverlay.kt    # 敏感操作确认条（悬浮窗）
+
+plugins/                       ← 归「插件内容」维护方（插件源文件）
+docs/PLUGIN_SPEC.md            ← 宿主能力契约（App 侧定义，双方共同遵守）
+docs/probes/                   ← 插件真机验证探针
 
 app/src/main/res/layout/       # activity_main(外壳+底栏) / page_home / page_lines / page_settings
                                # overlay_whale / overlay_bubble / overlay_plugin_confirm / item_line
 app/src/main/aidl/…/IShizukuCommand.aidl
 .github/workflows/build.yml    # CI：解码 keystore → assembleDebug + assembleRelease → 上传 artifact
 ```
+
+### 两方之间的接口（只有这三处）
+
+| 接口 | 位置 | 谁调用 |
+|---|---|---|
+| 基础能力 | `PluginAppBridge`（say / notify / vibrate / openUrl / openApp / shizuku） | 插件宿主调用，App 侧实现 |
+| 事件与生命周期 | `PluginEntry.onServiceStart / onServiceStop / onEvent` | App 侧调用，宿主实现 |
+| 管理界面入口 | `PluginEntry.showManager(activity)` | App 侧调用 |
+
+**只要这三个接口的签名不变**，两方即可独立改动各自的目录。
 
 ---
 

@@ -1,4 +1,4 @@
-package com.dsha.whalepet
+package com.dsha.whalepet.plugin
 
 import org.json.JSONObject
 
