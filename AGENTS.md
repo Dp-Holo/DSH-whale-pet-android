@@ -62,6 +62,7 @@ Android 悬浮窗桌宠「鲸鱼娘桌宠」：Kotlin + 单 Activity + 前台服
 | `PluginEngine` | 执行时限曾被判定"不支持"而移除 | **假结论，勿再回退**。根因是看错依赖：`com.faendir.rhino:rhino-android:1.6.0` 只是 Android 适配层，真正的 Rhino 是它传递引入的 `org.mozilla:rhino-runtime:1.7.13`，该版本**有** `ContextFactory.observeInstructionCount`（protected 非 final）与 `Context.setInstructionObserverThreshold`，`Interpreter`（1.7.13 第 3268-3271 行）也会回调。已于 1.1.29 重新启用：单次上限 500 万条指令，超时抛 `java.lang.Error`——Rhino 只对 Error 走 `EX_NO_JS_STATE`，脚本的 `try/catch` 吞不掉 |
 | `PluginEngine` | 插件"沙箱"曾缺 `ClassShutter` | 仅删 `Packages`/`java`/`getClass` 等全局**拦不住** `__bridge.getClass()`（实例方法，删全局无效）。1.1.29 起用 `ContextFactory` + `ClassShutter` 把脚本可访问的 Java 类限制为 `__bridge` 一个；**今后新增任何暴露给脚本的 Java 类型，必须同步加进白名单** |
 | `PluginManager` | `JSONArray.add` 编译失败 | Android 的 `org.json.JSONArray` 只有 `put()` |
+| `ShizukuCommandWhitelist` | 通知权限的 Shizuku 自动授予从未生效 | `pm grant <pkg> <权限>` 只有 **4 个参数**，却与 `appops set`（5 个参数）同放在 `args.size == 5` 分支 → 永远匹配不上，静默被拒。**1.1.32 由单元测试发现并修正**（顺带说明：这类"正面用例"测试很有价值） |
 | Shizuku 自动授权 | 授权后仍需手动开悬浮窗 | binder **异步到达**，必须 `addBinderReceivedListener`；授权结果走 `addRequestPermissionResultListener`（不是 `onRequestPermissionsResult`） |
 | `PluginLog` | 代码里提示 `whale-plugins.log`，真机上实际是 `whale-plugins.log.txt` | MediaStore 给 `text/plain` 自动补了 `.txt` 后缀。`PluginLog.filePath()` 与 UI 文案需与实际文件名一致（**待修，属插件宿主目录**） |
 | 插件授权对话框 | 一个能力都不勾也提示"已授权" | **已修**（1.1.31）：空选择时不再写入授权，改为提示未选择；提示文案复用 `plugin_caps_none`（措辞偏"未声明能力"，可微调） |
