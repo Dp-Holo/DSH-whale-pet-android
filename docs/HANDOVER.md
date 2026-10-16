@@ -1,7 +1,7 @@
 # 交接说明（HANDOVER）
 
 > 目的：让**其他 AI 代理或开发者**可以独立接手本项目，无需原会话上下文。
-> 先读 [`AGENTS.md`](../AGENTS.md)（硬规则与已知坑），再读本文。
+> 阅读顺序：先读 [`AGENTS.md`](../AGENTS.md)（硬规则与已知坑）→ [`ARCHITECTURE.md`](ARCHITECTURE.md)（结构与链路图）→ 本文。
 
 ---
 

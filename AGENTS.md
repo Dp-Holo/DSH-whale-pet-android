@@ -1,7 +1,8 @@
 # AGENTS.md — AI 协作约定
 
 > 本文件面向**任何接手本项目的 AI 代理**（Claude Code / Codex / Cursor / DSH 等）。
-> 一进仓库先读本文件，再读 [`docs/HANDOVER.md`](docs/HANDOVER.md)（完整交接说明）。
+> 一进仓库按这个顺序读：**本文件**（规矩与坑）→ [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)（结构与链路图）
+> → [`docs/HANDOVER.md`](docs/HANDOVER.md)（流程与凭据）；插件开发另读 [`docs/PLUGIN_SPEC.md`](docs/PLUGIN_SPEC.md)。
 
 ## 项目一句话
 
@@ -59,8 +60,8 @@ Android 悬浮窗桌宠「鲸鱼娘桌宠」：Kotlin + 单 Activity + 前台服
 | `PluginEngine` | 插件"沙箱"曾缺 `ClassShutter` | 仅删 `Packages`/`java`/`getClass` 等全局**拦不住** `__bridge.getClass()`（实例方法，删全局无效）。1.1.29 起用 `ContextFactory` + `ClassShutter` 把脚本可访问的 Java 类限制为 `__bridge` 一个；**今后新增任何暴露给脚本的 Java 类型，必须同步加进白名单** |
 | `PluginManager` | `JSONArray.add` 编译失败 | Android 的 `org.json.JSONArray` 只有 `put()` |
 | Shizuku 自动授权 | 授权后仍需手动开悬浮窗 | binder **异步到达**，必须 `addBinderReceivedListener`；授权结果走 `addRequestPermissionResultListener`（不是 `onRequestPermissionsResult`） |
-| `PluginLog` | 代码里提示 `whale-plugins.log`，真机上实际是 `whale-plugins.log.txt` | MediaStore 给 `text/plain` 自动补了 `.txt` 后缀。`PluginLog.filePath()` 与 UI 文案需与实际文件名一致（**待修**） |
-| `MainActivity.authorizePlugin` | 一个能力都不勾也提示"已授权" | 空授权应直接拒绝或忽略（**待修**） |
+| `PluginLog` | 代码里提示 `whale-plugins.log`，真机上实际是 `whale-plugins.log.txt` | MediaStore 给 `text/plain` 自动补了 `.txt` 后缀。`PluginLog.filePath()` 与 UI 文案需与实际文件名一致（**待修，属插件宿主目录**） |
+| 插件授权对话框 | 一个能力都不勾也提示"已授权" | **已修**（1.1.31）：空选择时不再写入授权，改为提示未选择；提示文案复用 `plugin_caps_none`（措辞偏"未声明能力"，可微调） |
 | 插件能力授权 | 授权后若插件文件被改动，能力声明可能变化 | 授权按 `pluginId` 存储，不校验插件内容版本；插件升级后应重新确认能力（**可加固**） |
 
 ## 交付给用户的固定动作
