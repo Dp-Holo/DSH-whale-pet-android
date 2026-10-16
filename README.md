@@ -116,6 +116,14 @@ docs/probes/                  # 插件真机验证探针
 
 ## 授权
 
-- 代码：MIT
+- 代码：MIT，全文见 [LICENSE](LICENSE)
 - 鲸鱼娘立绘（`res/drawable-nodpi/whale.png`）：社区二创，CC BY-NC-SA 4.0
   （来源：github.com/fornarwhal/deepseek-whale-girl-icon）
+
+## 其他文档
+
+- [版本历史](CHANGELOG.md)
+- [架构说明（含结构图与关键链路）](docs/ARCHITECTURE.md)
+- [AI 协作约定 / 接手须知](AGENTS.md)
+- [完整交接说明](docs/HANDOVER.md)
+- [插件开发契约](docs/PLUGIN_SPEC.md)
