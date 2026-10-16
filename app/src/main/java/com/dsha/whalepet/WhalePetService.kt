@@ -268,7 +268,7 @@ class WhalePetService : Service() {
             batteryLow = pct in 0..20 && !plugged
             // 插件事件：刚进入低电状态时触发一次
             if (batteryLow && !wasBatteryLow) {
-                PluginEntry.onEvent(this, "batteryLow", "{\"level\":$pct}")
+                PluginEntry.onEvent(this@WhalePetService, "batteryLow", "{\"level\":$pct}")
             }
             wasBatteryLow = batteryLow
         }
@@ -281,12 +281,12 @@ class WhalePetService : Service() {
                 Intent.ACTION_SCREEN_OFF -> {
                     stopWander()
                     pauseBalanceWatch()
-                    PluginEntry.onEvent(this, "screenOff")
+                    PluginEntry.onEvent(this@WhalePetService, "screenOff")
                 }
                 Intent.ACTION_SCREEN_ON -> {
                     startWander()
                     resumeBalanceWatch()
-                    PluginEntry.onEvent(this, "screenOn")
+                    PluginEntry.onEvent(this@WhalePetService, "screenOn")
                 }
             }
         }
@@ -509,14 +509,14 @@ class WhalePetService : Service() {
             // 双击：查余额
             singleTapRunnable?.let(handler::removeCallbacks)
             lastTapAt = 0
-            PluginEntry.onEvent(this, "doubleTap")
+            PluginEntry.onEvent(this@WhalePetService, "doubleTap")
             showBalanceAsync()
         } else {
             lastTapAt = now
             singleTapRunnable?.let(handler::removeCallbacks)
             singleTapRunnable = Runnable {
                 sayLine()
-                PluginEntry.onEvent(this, "tap")
+                PluginEntry.onEvent(this@WhalePetService, "tap")
             }
             handler.postDelayed(singleTapRunnable!!, 300)
         }
@@ -1105,7 +1105,7 @@ class WhalePetService : Service() {
                 if (decreased) {
                     // 插件事件：余额减少（与内置提示的节流相互独立）
                     PluginEntry.onEvent(
-                        this, "balanceDecreased",
+                        this@WhalePetService, "balanceDecreased",
                         "{\"value\":${amount.value},\"prev\":${prev ?: 0.0}}"
                     )
                     // 仅"减少"触发；充值/持平不触发。10 秒内最多提示一次
