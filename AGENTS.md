@@ -41,6 +41,9 @@ Android 悬浮窗桌宠「鲸鱼娘桌宠」：Kotlin + 单 Activity + 前台服
 4. **不要提交密钥**：签名 keystore 只存在于 GitHub Actions Secrets（`KEYSTORE_B64` / `KEYSTORE_PASSWORD` / `KEY_PASSWORD`）与用户自己的备份。
 5. **权限改动要克制**：新增 Android 权限必须在 PR/commit 里说明用途。
 6. **用户是唯一决策者**：涉及体验（动效、文案、交互）的改动，先问再改；不擅自扩大范围。
+7. **改安全边界必须带测试**：Shizuku 命令白名单、插件能力与敏感判定、插件 JSON 解析
+   已有 JVM 单元测试（`app/src/test/`），CI 会先跑 `./gradlew test`，不通过不出包。
+   改动这些逻辑时必须同步更新用例（该拒绝的用例比"能跑通"的用例更重要）。
 
 ## 代码约定
 

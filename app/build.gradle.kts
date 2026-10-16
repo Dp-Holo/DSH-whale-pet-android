@@ -13,7 +13,7 @@ android {
         targetSdk = 35
         // CI（GitHub Actions）里取 run number 保证每次发版 versionCode 递增；本地构建回退 1
         versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toIntOrNull() ?: 1
-        versionName = "1.1.31"
+        versionName = "1.1.32"
     }
 
     // 正式签名：keystore 由 CI 从 Actions secrets 注入（KEYSTORE_PATH 等环境变量）；
@@ -75,4 +75,8 @@ dependencies {
     // 插件脚本引擎：Android 版 Rhino（纯 Java，无需 NDK/JNI）
     implementation("com.faendir.rhino:rhino-android:1.6.0")
     // 余额查询走系统 HttpURLConnection（零三方依赖）
+
+    // 单元测试（JVM）：Android 内置的 org.json 在测试环境不存在，需单独引入实现
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }

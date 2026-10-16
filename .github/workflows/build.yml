@@ -39,6 +39,10 @@ jobs:
             echo "no keystore secret — release will be unsigned"
           fi
 
+      # 安全边界与解析逻辑的回归测试：不通过则不打包
+      - name: Run unit tests
+        run: ./gradlew test --no-daemon
+
       - name: Build APKs (debug + release)
         env:
           KEYSTORE_PATH: ${{ runner.temp }}/whale-release.jks

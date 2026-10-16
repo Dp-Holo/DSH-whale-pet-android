@@ -40,38 +40,10 @@ class ShizukuCommandService : IShizukuCommand.Stub() {
     }
 
     /**
-     * 允许的命令（白名单，目标包名必须是本应用）：
-     *  - appops set <pkg> SYSTEM_ALERT_WINDOW allow
-     *  - pm grant <pkg> android.permission.POST_NOTIFICATIONS
-     *  - dumpsys deviceidle whitelist +<pkg>   （加入电池优化白名单）
-     *
-     * 包名采用**精确匹配**（release / debug 两个确定值）：
-     * 前缀匹配会让 com.dsha.whalepet.evil 这类同前缀包名也被静默授权。
+     * 白名单校验：实现已抽到 [ShizukuCommandWhitelist]（纯逻辑，可单元测试）。
+     * 这里只做委托，避免安全规则散落在依赖 Android 的类里无法回归验证。
      */
-    private fun isAllowed(args: Array<String>): Boolean {
-        if (args.size == 5) {
-            val pkg = args[2]
-            if (pkg !in ALLOWED_PACKAGES) return false
-            return when {
-                args[0] == "appops" && args[1] == "set" &&
-                    args[3] == "SYSTEM_ALERT_WINDOW" && args[4] == "allow" -> true
-                args[0] == "pm" && args[1] == "grant" &&
-                    args[3] == "android.permission.POST_NOTIFICATIONS" -> true
-                else -> false
-            }
-        }
-        if (args.size == 4) {
-            if (args[0] != "dumpsys" || args[1] != "deviceidle" || args[2] != "whitelist") return false
-            val target = args[3]
-            return target.startsWith("+") && target.removePrefix("+") in ALLOWED_PACKAGES
-        }
-        return false
-    }
-
-    private companion object {
-        /** 仅本应用的确定包名（release / debug），精确匹配。 */
-        val ALLOWED_PACKAGES = setOf("com.dsha.whalepet", "com.dsha.whalepet.debug")
-    }
+    private fun isAllowed(args: Array<String>): Boolean = ShizukuCommandWhitelist.isAllowed(args)
 
     override fun destroy() {
         // Shizuku 要求销毁时退出独立进程
