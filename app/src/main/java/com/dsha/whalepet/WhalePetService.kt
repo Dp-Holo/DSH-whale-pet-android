@@ -5,8 +5,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.BroadcastReceiver
-import android.content.ContentUris
-import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -15,14 +13,12 @@ import android.graphics.PixelFormat
 import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
-import android.os.Environment
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
-import android.provider.MediaStore
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -31,6 +27,7 @@ import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import com.dsha.whalepet.common.MediaStoreLog
 import com.dsha.whalepet.plugin.PluginAppBridge
 import com.dsha.whalepet.plugin.PluginEntry
 import kotlin.math.abs
@@ -715,8 +712,7 @@ class WhalePetService : Service() {
      */
     private fun calibrateBounds() {
         appendDebugLine(
-            "=== whale debug start v${packageManager.getPackageInfo(packageName, 0).versionName} ===\n",
-            truncate = false
+            "=== whale debug start v${packageManager.getPackageInfo(packageName, 0).versionName} ===\n"
         )
         overlayParams.alpha = 0f
         val probeX = 200
@@ -894,10 +890,9 @@ class WhalePetService : Service() {
     }
 
     // ── 运行时诊断（写入 Download/whale-debug.txt，便于问题追溯）──
-    // 自清除：文件接近 1MB 时自动清空重写，保证长期运行也不会无限膨胀。
-    private var debugUri: Uri? = null
+    // 文件写入规则（同名变体归并、1MB 自清除、只处理本应用文件）集中在
+    // common/MediaStoreLog，与插件审计日志共用同一套实现。
     private var debugTick = 0
-    private val DEBUG_MAX_BYTES = 1 * 1024 * 1024
     private val DEBUG_FILE_NAME = "whale-debug.txt"
 
     /** 记录一行运行时状态到 Download/whale-debug.txt。 */
@@ -913,117 +908,22 @@ class WhalePetService : Service() {
                 "param=[${overlayParams.x},${overlayParams.y}] loc=[${loc[0]},${loc[1]}] " +
                 "xy=[${x.roundToInt()},${y.roundToInt()}] " +
                 "angle=${"%.3f".format(angle)} drag=$dragging\n"
-            // 超过 1MB 上限则清空重写（自清除历史数据）
-            val truncate = currentDebugSize() + line.length > DEBUG_MAX_BYTES
-            appendDebugLine(line, truncate = truncate)
+            appendDebugLine(line)
         } catch (_: Throwable) {
         }
     }
 
-    /** 诊断文件当前字节数（拿不到按 0 处理）。 */
-    private fun currentDebugSize(): Long {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return 0L
-        return try {
-            val uri = ensureDebugUri() ?: return 0L
-            contentResolver.query(uri, arrayOf(MediaStore.Downloads.SIZE), null, null, null)
-                ?.use { c -> if (c.moveToFirst()) c.getLong(0) else 0L } ?: 0L
+    /** 追加写入诊断文件；超过 1MB 时由 MediaStoreLog 自动清空重写。 */
+    private fun appendDebugLine(line: String) {
+        val version = try {
+            packageManager.getPackageInfo(packageName, 0).versionName
         } catch (_: Throwable) {
-            0L
+            ""
         }
-    }
-
-    /** 取回或创建诊断文件对应的 MediaStore uri。 */
-    /**
-     * 取回诊断文件 uri。
-     *
-     * 历史问题：旧实现按精确文件名查询，"查不到就新建"；而 MediaStore 遇到重名
-     * 会给新文件加 `(n)` 后缀，于是标准名永远查不到 → 每次服务启动都新建一个，
-     * Download 目录里堆积了 whale-debug.txt + whale-debug (1)…(13).txt。
-     *
-     * 现在：按前缀列出全部同名变体，只保留一个（优先标准名，其次最新），
-     * 其余全部删除；若保留的不是标准名则尝试改名回标准名，便于固定路径读取。
-     */
-    private fun ensureDebugUri(): Uri? {
-        debugUri?.let { return it }
-        return try {
-            val cr = contentResolver
-            val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
-            val found = mutableListOf<Triple<Long, String, Long>>()   // (id, name, dateAdded)
-            cr.query(
-                collection,
-                arrayOf(
-                    MediaStore.Downloads._ID,
-                    MediaStore.Downloads.DISPLAY_NAME,
-                    MediaStore.Downloads.DATE_ADDED
-                ),
-                // 只处理本应用自己创建的条目，避免误删用户手工做的同名备份
-                "${MediaStore.Downloads.DISPLAY_NAME} LIKE ? AND " +
-                    "${MediaStore.Downloads.OWNER_PACKAGE_NAME} = ?",
-                arrayOf("$DEBUG_FILE_NAME%", packageName),
-                null
-            )?.use { c ->
-                while (c.moveToNext()) {
-                    val name = c.getString(1) ?: ""
-                    if (name.startsWith("whale-debug")) {
-                        found.add(Triple(c.getLong(0), name, c.getLong(2)))
-                    }
-                }
-            }
-            if (found.isEmpty()) {
-                val values = ContentValues().apply {
-                    put(MediaStore.Downloads.DISPLAY_NAME, DEBUG_FILE_NAME)
-                    put(MediaStore.Downloads.MIME_TYPE, "text/plain")
-                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                }
-                debugUri = cr.insert(collection, values)
-            } else {
-                val keep = found.firstOrNull { it.second == DEBUG_FILE_NAME }
-                    ?: found.maxByOrNull { it.third }!!
-                // 删除其余重复文件（非本应用创建的系统会拒绝，忽略即可）
-                found.filter { it.first != keep.first }.forEach { (id, _, _) ->
-                    runCatching {
-                        cr.delete(ContentUris.withAppendedId(collection, id), null, null)
-                    }
-                }
-                val uri = ContentUris.withAppendedId(collection, keep.first)
-                if (keep.second != DEBUG_FILE_NAME) {
-                    // 尝试改回标准名，保证外部按固定路径能读到
-                    runCatching {
-                        cr.update(
-                            uri,
-                            ContentValues().apply {
-                                put(MediaStore.Downloads.DISPLAY_NAME, DEBUG_FILE_NAME)
-                            },
-                            null,
-                            null
-                        )
-                    }
-                }
-                debugUri = uri
-            }
-            debugUri
-        } catch (_: Throwable) {
-            null
-        }
-    }
-
-    /** 追加写入（MediaStore Downloads，Android 10+ 免权限）；truncate=true 时清空重写。 */
-    private fun appendDebugLine(line: String, truncate: Boolean) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
-        try {
-            val uri = ensureDebugUri() ?: return
-            contentResolver.openOutputStream(uri, if (truncate) "wt" else "wa")?.use { os ->
-                if (truncate) {
-                    os.write(
-                        "=== rolled over, history cleared (max 1MB) v${
-                            packageManager.getPackageInfo(packageName, 0).versionName
-                        } ===\n".toByteArray()
-                    )
-                }
-                os.write(line.toByteArray())
-            }
-        } catch (_: Throwable) {
-        }
+        MediaStoreLog.append(
+            this, DEBUG_FILE_NAME, line,
+            "=== rolled over, history cleared (max 1MB) v$version ==="
+        )
     }
 
     /** 屏幕是否点亮：熄屏时不查询余额（省电、省流量），亮屏由广播恢复。 */

@@ -18,6 +18,9 @@ Android 悬浮窗桌宠「鲸鱼娘桌宠」：Kotlin + 单 Activity + 前台服
 | **App 本体** | 悬浮窗/游动/交互、权限与 Shizuku、余额检测、台词、诊断、CI 与发布，以及**插件与 App 的兼容层** | `app/src/main/java/com/dsha/whalepet/*.kt`（不含 `plugin/`）、`res/`、`.github/` |
 | **插件宿主 + 插件内容** | 插件引擎与沙箱、能力授权、敏感确认、审计、插件管理界面、插件文件 | `app/src/main/java/com/dsha/whalepet/plugin/**`、`plugins/**`、`docs/PLUGIN_SPEC.md`、`docs/probes/**` |
 
+> `app/src/main/java/com/dsha/whalepet/common/**` 是双方**共享基础设施**（目前只有 `MediaStoreLog`：
+> 诊断日志与审计日志共用的写文件逻辑）。改它等于同时影响两边，需双方确认。
+
 **两方之间只有三个接口**（改动接口需双方确认）：
 
 1. `PluginAppBridge` —— App 提供给插件的基础能力（say / notify / vibrate / openUrl / openApp / shizuku）
@@ -64,7 +67,7 @@ Android 悬浮窗桌宠「鲸鱼娘桌宠」：Kotlin + 单 Activity + 前台服
 | `PluginManager` | `JSONArray.add` 编译失败 | Android 的 `org.json.JSONArray` 只有 `put()` |
 | `ShizukuCommandWhitelist` | 通知权限的 Shizuku 自动授予从未生效 | `pm grant <pkg> <权限>` 只有 **4 个参数**，却与 `appops set`（5 个参数）同放在 `args.size == 5` 分支 → 永远匹配不上，静默被拒。**1.1.32 由单元测试发现并修正**（顺带说明：这类"正面用例"测试很有价值） |
 | Shizuku 自动授权 | 授权后仍需手动开悬浮窗 | binder **异步到达**，必须 `addBinderReceivedListener`；授权结果走 `addRequestPermissionResultListener`（不是 `onRequestPermissionsResult`） |
-| `PluginLog` | 代码里提示 `whale-plugins.log`，真机上实际是 `whale-plugins.log.txt` | MediaStore 给 `text/plain` 自动补了 `.txt` 后缀。`PluginLog.filePath()` 与 UI 文案需与实际文件名一致（**待修，属插件宿主目录**） |
+| `MediaStoreLog`（诊断/审计共用） | 真机文件名会被补成 `.txt`（如 `whale-plugins.log.txt`） | MediaStore 给 `text/plain` 自动补后缀。1.1.38 起两套写文件逻辑合并到 `common/MediaStoreLog`，`filePath()` 仍返回标准名（用于提示）；界面上已不再显示该路径，避免误导 |
 | 插件授权对话框 | 一个能力都不勾也提示"已授权" | **已修**（1.1.31）：空选择时不再写入授权，改为提示未选择；提示文案复用 `plugin_caps_none`（措辞偏"未声明能力"，可微调） |
 | 插件能力授权 | 授权后若插件文件被改动，能力声明可能变化 | 授权按 `pluginId` 存储，不校验插件内容版本；插件升级后应重新确认能力（**可加固**） |
 

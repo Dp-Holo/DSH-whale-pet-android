@@ -67,11 +67,9 @@
     <!-- 插件 -->
     <string name="plugins_entry">插件</string>
     <string name="plugins_title">插件</string>
-    <string name="plugins_hint">点插件可启用/停用、授权或删除；安装可粘贴 JSON 或装示例</string>
     <string name="plugin_allow">允许</string>
     <string name="plugin_deny">拒绝</string>
     <string name="plugin_always_allow">始终允许</string>
-    <string name="plugin_confirm_title">插件请求敏感操作</string>
     <string name="plugin_install_hint">粘贴插件 JSON</string>
     <string name="plugin_install">安装</string>
     <string name="plugin_install_sample">安装示例插件</string>
@@ -85,7 +83,6 @@
     <string name="plugin_enable">启用</string>
     <string name="plugin_disable">停用</string>
     <string name="plugin_revoke">撤销授权</string>
-    <string name="plugin_audit_log">审计日志：Download/whale-plugins.log</string>
     <string name="plugin_state_on">已启用</string>
     <string name="plugin_state_off">已停用</string>
     <string name="plugin_caps_none">未声明能力</string>
