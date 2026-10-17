@@ -22,7 +22,7 @@
     <string name="no_api_key">未设置 API Key</string>
     <string name="auto_granted">已通过 Shizuku 自动授权</string>
     <string name="granting_overlay">正在通过 Shizuku 自动授权…</string>
-    <string name="auto_grant_failed">Shizuku 自动授权未生效：%1$s</string>
+    <string name="auto_grant_failed">自动授权未生效，请点「授予悬浮窗权限」手动开启（%1$s）</string>
 
     <!-- 底栏与分页 -->
     <string name="tab_home">主页</string>
