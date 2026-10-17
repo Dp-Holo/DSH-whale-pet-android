@@ -10,7 +10,7 @@
     <string name="overlay_granted">悬浮窗权限已授予</string>
     <string name="api_key_hint">粘贴 DeepSeek API Key（sk-…）</string>
     <string name="check_balance_now">立即查余额</string>
-    <string name="balance_hint">余额将显示在鲸鱼娘头顶</string>
+    <string name="balance_hint">查询结果显示在鲸鱼娘头顶</string>
 
     <!-- 通知 -->
     <string name="notif_channel_name">鲸鱼娘桌宠</string>
@@ -28,7 +28,7 @@
     <string name="tab_home">主页</string>
     <string name="tab_lines">台词管理</string>
     <string name="tab_settings">设置</string>
-    <string name="home_hint">启动后鲸鱼娘会浮在屏幕上自由游泳\n单击说话 · 双击看余额 · 拖动换位置</string>
+    <string name="home_hint">点「启动桌宠」开始\n单击说话 · 双击看余额 · 拖动换位置</string>
 
     <!-- 台词管理 -->
     <string name="lines_title">台词管理</string>
@@ -55,11 +55,11 @@
     <string name="token_nibble_line">正在偷吃用户token...</string>
 
     <!-- 通知设置 -->
-    <string name="notif_settings">通知设置（可彻底关闭常驻通知）</string>
+    <string name="notif_settings">通知设置</string>
 
     <!-- 设置页 / 关于 -->
     <string name="settings_title">设置</string>
-    <string name="settings_perm_hint">授权类操作（已授予的项目会自动隐藏）</string>
+    <string name="settings_perm_hint">点下面按钮前往系统设置完成授权</string>
     <string name="about_entry">关于鲸鱼娘桌宠</string>
     <string name="about_title">关于鲸鱼娘桌宠 · 技术说明</string>
     <string name="about_open_github">打开 GitHub 仓库</string>
@@ -68,7 +68,7 @@
     <!-- 插件 -->
     <string name="plugins_entry">插件</string>
     <string name="plugins_title">插件</string>
-    <string name="plugins_hint">脚本型插件（JS）：能力需授权，敏感操作每次确认，全部调用写入审计日志</string>
+    <string name="plugins_hint">点插件可启用/停用、授权或删除；安装可粘贴 JSON 或装示例</string>
     <string name="plugin_allow">允许</string>
     <string name="plugin_deny">拒绝</string>
     <string name="plugin_always_allow">始终允许</string>
