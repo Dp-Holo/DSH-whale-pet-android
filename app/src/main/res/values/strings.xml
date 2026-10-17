@@ -63,20 +63,6 @@
     <string name="about_entry">关于鲸鱼娘桌宠</string>
     <string name="about_title">关于鲸鱼娘桌宠</string>
     <string name="about_open_github">打开 GitHub 仓库</string>
-    <string name="about_body">版本 %1$s
-
-由 DSHA（DeepSeek Harness Android）驱动 deepseek-v4-flash 构建。
-
-隐私
-· API Key 仅保存在本机，只用于查询余额
-· 不做统计与追踪；诊断日志只写在本机下载目录
-
-许可
-· 代码 MIT
-· 鲸鱼娘立绘 CC BY-NC-SA 4.0
-
-仓库
-github.com/Dp-Holo/DSH-whale-pet-android</string>
 
     <!-- 插件 -->
     <string name="plugins_entry">插件</string>
@@ -105,4 +91,15 @@ github.com/Dp-Holo/DSH-whale-pet-android</string>
     <string name="plugin_caps_none">未声明能力</string>
     <string name="plugin_notif_channel">插件通知</string>
     <string name="plugin_confirm_format">插件「%1$s」请求执行敏感操作：\n%2$s</string>
+
+    <string name="about_version_format">版本 %1$s</string>
+    <string name="about_desc">由 DSHA（DeepSeek Harness Android）驱动 deepseek-v4-flash 构建。</string>
+    <string name="about_privacy_title">隐私</string>
+    <string name="about_privacy_body">· API Key 仅保存在本机，只用于查询余额
+· 不做统计与追踪；诊断日志只写在本机下载目录</string>
+    <string name="about_license_title">许可</string>
+    <string name="about_license_body">· 代码 MIT
+· 鲸鱼娘立绘 CC BY-NC-SA 4.0</string>
+    <string name="about_repo_title">仓库</string>
+    <string name="about_repo_body">github.com/Dp-Holo/DSH-whale-pet-android</string>
 </resources>

@@ -393,16 +393,34 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** 关于对话框：版本、来源、隐私、许可与仓库入口（版本号自动读取，避免手写遗漏）。 */
+    /** 关于对话框：版本、来源、隐私、许可与仓库入口（分段排版；版本号自动读取，避免手写遗漏）。 */
     private fun showAbout() {
         val version = try {
             packageManager.getPackageInfo(packageName, 0).versionName ?: ""
         } catch (_: Throwable) {
             ""
         }
+        val view = layoutInflater.inflate(R.layout.dialog_about, null)
+        view.findViewById<TextView>(R.id.tv_about_version).text =
+            getString(R.string.about_version_format, version)
+        view.findViewById<TextView>(R.id.tv_about_desc).text = getString(R.string.about_desc)
+        view.findViewById<TextView>(R.id.tv_about_privacy_title).text =
+            getString(R.string.about_privacy_title)
+        view.findViewById<TextView>(R.id.tv_about_privacy_body).text =
+            getString(R.string.about_privacy_body)
+        view.findViewById<TextView>(R.id.tv_about_license_title).text =
+            getString(R.string.about_license_title)
+        view.findViewById<TextView>(R.id.tv_about_license_body).text =
+            getString(R.string.about_license_body)
+        view.findViewById<TextView>(R.id.tv_about_repo_title).text =
+            getString(R.string.about_repo_title)
+        val repo = view.findViewById<TextView>(R.id.tv_about_repo_body)
+        repo.text = getString(R.string.about_repo_body)
+        repo.setOnClickListener { openGithub() }   // 地址本身可点，省去再找按钮
+
         AlertDialog.Builder(this)
             .setTitle(R.string.about_title)
-            .setMessage(getString(R.string.about_body, version))
+            .setView(view)
             .setPositiveButton(R.string.about_open_github) { _, _ -> openGithub() }
             .setNegativeButton(R.string.cancel, null)
             .show()
