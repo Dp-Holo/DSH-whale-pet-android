@@ -33,7 +33,9 @@
 2. 读 `AGENTS.md` → 按「硬规则 + 交付固定动作」执行
 3. 设备能力通过 DSHA 的 App 层接口（`/app/*`）。
    ⚠️ 容器虽然 bind-mount 了 `/sdcard`，但 DSHA 约束「**Android 设备文件写入必须走受保护的设备 shell**」，
-   因此**不要直接 `cp` 写 `/sdcard`**。交付产物要用 `/app/export`（该通道会自动 gzip，落地名带 `.gz`）。
+   因此**不要直接 `cp` 写 `/sdcard`**。交付产物要用 `/app/export`——注意它只是给**文件名**追加 `.gz`，
+   内容仍是原始字节（实测落地文件头是 `PK`、大小与源文件相同），所以导出后必须用设备 shell
+   `cp` 成 `.apk` 结尾，否则安装器不认扩展名，用户会"装不上"。
    设备 shell 也无法接收容器里的文件，且 `pm install` 被策略禁止 → **安装 APK 只能由用户完成**。
 4. 真机问题优先读 `Download/whale-debug.txt`
 

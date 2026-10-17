@@ -81,8 +81,10 @@ Android 悬浮窗桌宠「鲸鱼娘桌宠」：Kotlin + 单 Activity + 前台服
 # 1) 升版本号后提交
 git commit -m "..." && git push
 # 2) 等 CI success（GitHub Actions）→ 下载 release artifact → 解压取 app-release.apk
-# 3) 交付到手机：/app/export?path=<apk>   → 落在 Download/DSHA/
-# 4) 告诉用户：文件名、字节数、SHA256、本版改了什么、怎么验证
+# 3) 交付到手机：/app/export?path=<apk>   → 落在 Download/DSHA/，但名字会被追加 .gz
+# 4) 立刻用设备 shell 复制成 .apk 结尾（否则安装器不认，用户会"装不上"）：
+#    adb-shell cp /sdcard/Download/DSHA/<name>.apk.gz /sdcard/Download/DSHA/<name>.apk
+# 5) 告诉用户：文件名、字节数、SHA256、本版改了什么、怎么验证
 ```
 
 **交付通道的硬约束（勿绕）**：
@@ -90,9 +92,11 @@ git commit -m "..." && git push
 - 容器虽然 bind-mount 了 `/sdcard`，但 DSHA 约束「**Android 设备文件写入必须走受保护的设备 shell**」，
   所以**不要直接 `cp` 到 `/sdcard`**。
 - 设备 shell 也**收不到**容器里的文件（没有 push）；`pm install` 被策略明确禁止
-  （原话：`pm 只允许查询；安装、卸载、清数据和授权不开放给设备命令`），`gzip`/`unzip`/`tar` 同样被拦。
+  （原话：`pm 只允许查询；安装、卸载、清数据和授权不开放给设备命令`），`gzip`/`unzip`/`tar`/`am` 同样被拦。
   → **APK 安装只能由用户完成**，代理不得改用 UI 自动化绕过。
-- `/app/export` 会自动 gzip（落地名带 `.gz`，连 `.json` 也照 gzip），用户需自行解压。
+- ⚠️ **`/app/export` 只是给文件名追加 `.gz`，内容仍是原始字节**（1.1.39 实测：落地文件头是 `PK\x03\x04`，
+  大小与源文件**完全相同**）。别照着后缀就断言"被压缩了"、更别让用户去解压——他解不出来。
+  正确做法是第 4 步用设备 shell `cp` 成 `.apk` 结尾，再用文件管理器打开。
 
 ## 设备侧排查手段（很有用）
 
