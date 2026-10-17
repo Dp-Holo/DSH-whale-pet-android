@@ -61,9 +61,22 @@
     <string name="settings_title">设置</string>
     <string name="settings_perm_hint">点下面按钮前往系统设置完成授权</string>
     <string name="about_entry">关于鲸鱼娘桌宠</string>
-    <string name="about_title">关于鲸鱼娘桌宠 · 技术说明</string>
+    <string name="about_title">关于鲸鱼娘桌宠</string>
     <string name="about_open_github">打开 GitHub 仓库</string>
-    <string name="about_body">本项目由 DSHA（DeepSeek Harness Android）驱动 deepseek-v4-flash 模型编写并构建：需求拆解、代码实现、缺陷修复、CI 构建到 GitHub 发行，全流程由该模型完成。\n\n技术要点\n· Kotlin 2.0.20 + AGP 8.5.2，minSdk 26 / targetSdk 35，正式签名发布\n· 单 Activity + 前台服务（specialUse 类型）承载系统悬浮窗\n· 悬浮窗边界：WindowMetrics 安全区 + getLocationOnScreen 实测坐标偏移校准\n· 独立气泡／余额窗口与鲸鱼主窗口分离，互不干扰触摸与布局\n· 运动模型：角度制漫游 + 镜面反射（出射角限幅）+ 近边界软排斥\n· Shizuku UserService（AIDL + 命令白名单）免 root 授予权限，命令仅限本应用包名\n· 余额检测与展示分离：3 秒静默比对，5 分钟轮询展示\n· 插件系统：Rhino 脚本沙箱（唯一 Java 入口 + 能力授权 + 敏感二次确认 + 审计）\n· GitHub Actions 构建，签名密钥存于 Actions Secrets\n· 运行时诊断写入 Download/whale-debug.txt，超 1MB 自动清除历史\n\n代码许可 MIT · 鲸鱼娘立绘 CC BY-NC-SA 4.0\n仓库：https://github.com/Dp-Holo/DSH-whale-pet-android</string>
+    <string name="about_body">版本 %1$s
+
+由 DSHA（DeepSeek Harness Android）驱动 deepseek-v4-flash 构建。
+
+隐私
+· API Key 仅保存在本机，只用于查询余额
+· 不做统计与追踪；诊断日志只写在本机下载目录
+
+许可
+· 代码 MIT
+· 鲸鱼娘立绘 CC BY-NC-SA 4.0
+
+仓库
+github.com/Dp-Holo/DSH-whale-pet-android</string>
 
     <!-- 插件 -->
     <string name="plugins_entry">插件</string>

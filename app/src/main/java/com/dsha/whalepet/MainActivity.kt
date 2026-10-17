@@ -393,11 +393,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** 关于对话框：技术说明 + GitHub 仓库入口。 */
+    /** 关于对话框：版本、来源、隐私、许可与仓库入口（版本号自动读取，避免手写遗漏）。 */
     private fun showAbout() {
+        val version = try {
+            packageManager.getPackageInfo(packageName, 0).versionName ?: ""
+        } catch (_: Throwable) {
+            ""
+        }
         AlertDialog.Builder(this)
             .setTitle(R.string.about_title)
-            .setMessage(R.string.about_body)
+            .setMessage(getString(R.string.about_body, version))
             .setPositiveButton(R.string.about_open_github) { _, _ -> openGithub() }
             .setNegativeButton(R.string.cancel, null)
             .show()

@@ -30,11 +30,7 @@
 
 ## 与 App 侧的接口变更
 
-需要新的**事件**或**动作能力**时：
-
-1. 在本目录或 Issue 里提出需求（说明：要什么能力、什么场景、是否敏感）
-2. 由 App 侧实现（`PluginCaps` → `handleCall` → 胶水暴露 → ClassShutter 同步）
-3. App 侧更新 `docs/PLUGIN_SPEC.md` 与 `apiVersion`
-4. 插件侧再使用新能力
+需要新的**事件**或**动作能力**时，按 [`../docs/PLUGIN_SPEC.md`](../docs/PLUGIN_SPEC.md) §9「契约变更流程」提需求
+（说明：要什么能力、什么场景、是否敏感），由 App 侧实现并更新契约后再使用。
 
 **不要**直接改 App 代码目录（那是宿主实现，改动会破坏安全模型）。

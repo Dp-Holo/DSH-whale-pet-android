@@ -79,8 +79,9 @@ push 到 `main` 分支自动触发，或在 Actions 页手动 `Run workflow`。
 
 ## 本地构建
 
+> 本项目日常通过 GitHub Actions 构建；本地构建仅为备选方式（需要自备 JDK 17 + Android SDK）。
+
 ```bash
-# 需要 JDK 17 + Android SDK
 ./gradlew assembleDebug
 # 产物：app/build/outputs/apk/debug/
 ```

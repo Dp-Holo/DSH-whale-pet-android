@@ -15,17 +15,13 @@
 - **构建**：GitHub Actions（`.github/workflows/build.yml`）→ debug + 签名 release APK
 - **起点**：由 DSHA（DeepSeek Harness Android）驱动 deepseek-v4-flash 编写构建
 
-### 功能清单（当前）
+### 功能范围
 
-| 模块 | 内容 |
-|---|---|
-| 悬浮窗桌宠 | 自主游动（角度制漫游 + 镜面反射 + 近边界软排斥）、单击台词（含"至少隔两句"去重）、双击查余额、拖动 |
-| 余额 | 5 分钟轮询展示；**3 秒静默检测**，余额**减少**时自动冒「正在偷吃用户token...」（10 秒节流）；**熄屏暂停**两类查询，亮屏立即恢复（1.1.29 起） |
-| 状态联动 | 低电量提示、息屏暂停游动 |
-| 台词管理 | 条目化增删改（本地 JSON 持久化，即时生效） |
-| 权限 | 悬浮窗、通知（Shizuku 可自动授予）、电池优化白名单 |
-| 插件系统 | 脚本型（JS 沙箱）：7 事件 × 7 动作、能力授权、敏感操作二次确认、审计日志；沙箱为 Rhino `ClassShutter`（脚本仅 `__bridge` 一个 Java 类可见）+ 单次执行指令上限（1.1.29 起） |
-| 诊断 | `Download/whale-debug.txt`（运行时状态）、`Download/whale-plugins.log.txt`（插件审计），均 1MB 自清除 |
+用户向的完整功能说明见 [README「功能」](../README.md)，这里只留**接手者需要知道的边界**：
+
+- **插件系统有独立契约**：[PLUGIN_SPEC.md](PLUGIN_SPEC.md)，改动插件逻辑前必读；宿主代码在 `plugin/` 目录，与 App 本体分开维护
+- **余额有两条独立通道**：5 分钟展示 + 3 秒静默检测（息屏时都暂停）；改动时要保证两者互不影响
+- **诊断与审计日志**写在手机 `Download/` 下，是排查真机问题的第一手材料
 
 ---
 
@@ -114,18 +110,11 @@ app/src/main/aidl/…/IShizukuCommand.aidl
 
 ## 5. 标准工作流（每次迭代）
 
-```bash
-# 1) 改代码 + 升 versionName（app/build.gradle.kts）
-# 2) 提交推送
-git add -A && git commit -m "<type>: <中文说明>" && git push
-# 3) 等 CI 成功（GitHub Actions；失败看日志里的 e: 行）
-# 4) 下载 release artifact → 解压取 app-release.apk
-# 5) 交付：/app/export?path=<apk>（落 Download/DSHA；通道会自动 gzip，用户自行解压安装）
-#    容器直写 /sdcard 被约束禁止、pm install 被策略禁止 → 安装由用户完成
-#    并告知用户：文件名 / 字节数 / SHA256 / 本版改动 / 验证方法
-```
+流程以 [`AGENTS.md`](../AGENTS.md) 的「交付给用户的固定动作」为准（改代码 → 升版本号 → 推送 → 等 CI → 取 artifact → 交付），
+其中包含构建、取包与交付到手机的硬约束，这里不再重复。
 
-**发版规则**（用户指定，务必遵守）：小迭代 `1.1.x` 不发 Release；大迭代 `1.2/1.3` 仅按用户指令发布；Release 页只留最新（旧版转 draft）。
+唯一差异：若你在**外部工具**（非 DSHA 环境）接管，最后一步"交付到手机"只能由用户手动完成，详见 §2 路径 B。
+发版规则同样见 `AGENTS.md` 硬规则 2。
 
 ---
 
