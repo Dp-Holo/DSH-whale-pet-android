@@ -4,9 +4,6 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * 插件宿主能力接口（由本包 PluginHostImpl 实现；敏感确认走悬浮确认条）。
@@ -51,8 +48,6 @@ object PluginManager {
     /** 规则触发的冷却记录：pluginId#ruleIndex → 上次触发时间。 */
     private val lastFire = mutableMapOf<String, Long>()
 
-    private val tsFormat = SimpleDateFormat("MM-dd HH:mm:ss", Locale.US)
-
     // ── 文件与加载 ────────────────────────────────────────────
 
     private fun dir(ctx: Context): File {
@@ -82,11 +77,17 @@ object PluginManager {
         val stamp = dirStamp(ctx)
         cache?.let { if (stamp == cacheStamp) return it }
         val list = files(ctx).mapNotNull { f ->
-            try {
+            val parsed = try {
                 Plugin.parse(f.readText())
             } catch (_: Throwable) {
                 null
             }
+            if (parsed == null) {
+                // 不静默丢弃：JSON 写错或 id 不合规时用户只会看到"装了但没反应"。
+                // 缓存保证同一份坏文件不会反复刷日志。
+                audit(ctx, f.name, "load", "插件文件无法解析，已跳过", "error")
+            }
+            parsed
         }
         cache = list
         cacheStamp = stamp
@@ -105,7 +106,14 @@ object PluginManager {
     fun install(ctx: Context, json: String): Plugin? {
         val p = Plugin.parse(json) ?: return null
         return try {
-            File(dir(ctx), "${p.id}.json").writeText(json)
+            val target = File(dir(ctx), "${p.id}.json")
+            // 覆盖安装必须先清空旧授权。授权（含"始终允许"）是按 pluginId 存储的，
+            // 若沿用旧记录，新脚本会直接继承上一份脚本的全部能力——用户从外部
+            // 粘贴一个同 id 的 JSON，就等于跳过了授权确认这一步。
+            if (target.exists()) {
+                revokeAll(ctx, p.id)
+            }
+            target.writeText(json)
             invalidateCache()
             PluginEngine.unload(p.id)          // 覆盖安装后强制重新加载
             p
@@ -180,6 +188,9 @@ object PluginManager {
         readMap(ctx, KEY_GRANTS)[pluginId] ?: emptySet()
 
     fun grant(ctx: Context, pluginId: String, caps: Collection<String>) {
+        // 空集合直接忽略：写入它只会留下一条"授权能力为空"的误导性审计，
+        // 语义上也等于没授权（UI 层已挡，这里是公共 API 的兜底）。
+        if (caps.isEmpty()) return
         val map = readMap(ctx, KEY_GRANTS)
         val cur = map[pluginId] ?: mutableSetOf()
         cur.addAll(caps)
@@ -220,9 +231,10 @@ object PluginManager {
         result: String,
         detail: String = ""
     ) {
-        val line = "${tsFormat.format(Date())} | $pluginId | $event | $action | $result" +
-            if (detail.isBlank()) "" else " | $detail"
-        PluginLog.append(ctx, line)
+        // 行格式、时间戳与换行转义统一交给 AuditFormat：
+        // 那边用不可变的 DateTimeFormatter（线程安全），并保证"一次调用 = 一行"，
+        // 防止不可信的 pluginId / log 正文伪造出额外审计行。
+        PluginLog.append(ctx, AuditFormat.line(pluginId, event, action, result, detail))
     }
 
     /** 审计日志路径（供界面展示）。 */
@@ -276,15 +288,7 @@ object PluginManager {
 
     // ── 统一能力入口（脚本与规则共用）──────────────────────────
 
-    private fun capabilityOf(action: String): String = when (action) {
-        "say" -> PluginCaps.SAY
-        "notify" -> PluginCaps.NOTIFY
-        "vibrate" -> PluginCaps.VIBRATE
-        "openUrl" -> PluginCaps.OPEN_URL
-        "openApp" -> PluginCaps.OPEN_APP
-        "shizuku" -> PluginCaps.SHIZUKU
-        else -> ""
-    }
+    private fun capabilityOf(action: String): String = PluginCaps.ofAction(action)
 
     private fun describe(action: String, args: List<String>): String = when (action) {
         "say" -> "说话：${args.getOrElse(0) { "" }}"

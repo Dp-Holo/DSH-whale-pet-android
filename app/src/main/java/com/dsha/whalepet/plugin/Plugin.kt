@@ -28,6 +28,23 @@ object PluginCaps {
         SHIZUKU -> "执行系统命令（Shizuku）"
         else -> cap
     }
+
+    /**
+     * 动作类型 → 所需能力；纯记录（`log`）与未知动作返回空串。
+     *
+     * 这是"动作"与"能力"之间**唯一**的映射来源：[PluginAction.capability] 与
+     * `PluginManager` 的能力校验都走这里。此前两处各写一份 `when`，
+     * 新增能力时容易只改一处，导致"声明了却永远判为未授权"。
+     */
+    fun ofAction(type: String): String = when (type) {
+        SAY -> SAY
+        NOTIFY -> NOTIFY
+        VIBRATE -> VIBRATE
+        OPEN_URL -> OPEN_URL
+        OPEN_APP -> OPEN_APP
+        SHIZUKU -> SHIZUKU
+        else -> ""
+    }
 }
 
 /** 插件动作。 */
@@ -42,15 +59,7 @@ data class PluginAction(
 ) {
     /** 该动作需要的能力；log 等纯记录动作返回空串。 */
     val capability: String
-        get() = when (type) {
-            "say" -> PluginCaps.SAY
-            "notify" -> PluginCaps.NOTIFY
-            "vibrate" -> PluginCaps.VIBRATE
-            "openUrl" -> PluginCaps.OPEN_URL
-            "openApp" -> PluginCaps.OPEN_APP
-            "shizuku" -> PluginCaps.SHIZUKU
-            else -> ""
-        }
+        get() = PluginCaps.ofAction(type)
 
     /** 可读描述（用于二次确认与审计）。 */
     fun describe(): String = when (type) {
@@ -88,11 +97,26 @@ data class Plugin(
         get() = script.isNotBlank()
 
     companion object {
+        /**
+         * 插件 id 的允许字符集：字母或数字开头，其后只允许字母、数字、`.`、`_`、`-`，总长 ≤ 64。
+         *
+         * **为什么必须校验**：`id` 会直接拼成文件名（`<id>.json`）写进插件目录，而插件 JSON
+         * 是用户从外部粘贴的**不可信输入**。不校验时 `"id": "../whale_lines"` 会穿过目录边界
+         * 去写别的文件，`"id": "other-plugin"` 会覆盖另一个插件的文件。
+         * 由于字符集里不含 `/`，路径穿越与目录逃逸在源头上就不可能发生。
+         *
+         * 大小写都允许，是为了不把用户已有的 `MyPlugin` 之类旧插件判为非法。
+         */
+        private val ID_PATTERN = Regex("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+        /** id 是否合法（见 [ID_PATTERN]）。 */
+        fun isValidId(id: String): Boolean = ID_PATTERN.matches(id)
+
         /** 解析插件 JSON；格式不合法返回 null。 */
         fun parse(json: String): Plugin? = try {
             val o = JSONObject(json)
             val id = o.optString("id").trim()
-            if (id.isEmpty()) {
+            if (!isValidId(id)) {
                 null
             } else {
                 val rules = mutableListOf<PluginRule>()

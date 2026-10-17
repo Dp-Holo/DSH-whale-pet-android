@@ -1,0 +1,10 @@
+{
+  "id": "screen-greeting",
+  "name": "亮屏问候",
+  "version": 2,
+  "enabled": true,
+  "capabilities": [
+    "say"
+  ],
+  "script": "on('screenOn', function (c) { say('你回来啦！'); });"
+}

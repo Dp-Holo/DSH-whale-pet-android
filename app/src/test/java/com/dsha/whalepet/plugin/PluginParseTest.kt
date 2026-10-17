@@ -128,4 +128,40 @@ class PluginParseTest {
         assertFalse(p!!.isScript)
         assertTrue(p.rules.isEmpty())
     }
+
+    // ── id 字符集（安全边界：id 会被拼成文件名落盘）────────────────
+
+    @Test
+    fun acceptsReasonableIds() {
+        listOf("balance-guard", "a", "MyPlugin", "a.b_c-1", "0abc", "a".repeat(64)).forEach {
+            assertTrue("应接受 id=$it", Plugin.isValidId(it))
+        }
+    }
+
+    /**
+     * 这些 id 会把 `<id>.json` 写到插件目录之外，或覆盖别的插件文件。
+     * 插件 JSON 是用户从外部粘贴的不可信输入，必须在这里挡住。
+     */
+    @Test
+    fun rejectsIdsThatCouldEscapePluginDir() {
+        listOf("../whale_lines", "..", ".", "a/b", "/abs", "a\\b").forEach {
+            assertFalse("应拒绝 id=$it", Plugin.isValidId(it))
+            // 解析层也要一并拒绝（不只是 isValidId 的工具函数层面）
+            assertNull("应拒绝解析 id=$it", Plugin.parse("""{ "id": "$it", "name": "x" }"""))
+        }
+    }
+
+    @Test
+    fun rejectsIdsWithControlOrIllegalChars() {
+        // 换行会伪造审计日志行；其余字符不在约定字符集内
+        listOf("a\nb", "a\rb", "a|b", "含中文", "a b", "-lead", "_lead", ".lead", "").forEach {
+            assertFalse("应拒绝 id=${it.replace("\n", "\\n").replace("\r", "\\r")}", Plugin.isValidId(it))
+        }
+    }
+
+    @Test
+    fun rejectsOverlongId() {
+        assertTrue(Plugin.isValidId("a".repeat(64)))
+        assertFalse(Plugin.isValidId("a".repeat(65)))
+    }
 }

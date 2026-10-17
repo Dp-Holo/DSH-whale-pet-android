@@ -69,7 +69,9 @@ Android 悬浮窗桌宠「鲸鱼娘桌宠」：Kotlin + 单 Activity + 前台服
 | Shizuku 自动授权 | 授权后仍需手动开悬浮窗 | binder **异步到达**，必须 `addBinderReceivedListener`；授权结果走 `addRequestPermissionResultListener`（不是 `onRequestPermissionsResult`） |
 | `MediaStoreLog`（诊断/审计共用） | 真机文件名会被补成 `.txt`（如 `whale-plugins.log.txt`） | MediaStore 给 `text/plain` 自动补后缀。1.1.38 起两套写文件逻辑合并到 `common/MediaStoreLog`，`filePath()` 仍返回标准名（用于提示）；界面上已不再显示该路径，避免误导 |
 | 插件授权对话框 | 一个能力都不勾也提示"已授权" | **已修**（1.1.31）：空选择时不再写入授权，改为提示未选择；提示文案复用 `plugin_caps_none`（措辞偏"未声明能力"，可微调） |
-| 插件能力授权 | 授权后若插件文件被改动，能力声明可能变化 | 授权按 `pluginId` 存储，不校验插件内容版本；插件升级后应重新确认能力（**可加固**） |
+| 插件能力授权 | 覆盖安装（同 id）会继承旧脚本的授权 | **已修**（1.1.39）：`PluginManager.install()` 覆盖已有文件前先 `revokeAll()`（含"始终允许"）。否则粘贴一份同 id 的新脚本就能直接拿到旧脚本的能力，连带免掉敏感操作确认 |
+| 插件 `id` | 未校验 → 可路径穿越 / 覆盖别的插件文件 | **已修**（1.1.39）：`Plugin.parse` 强制 `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`。id 会拼成 `<id>.json` 落盘，而插件 JSON 是外部粘贴的不可信输入；字符集不含 `/` 后穿越从源头不可能。解析失败的插件文件现在会写审计，不再静默消失 |
+| 插件审计日志 | 插件可伪造日志行 / 时间戳可能错乱 | **已修**（1.1.39）：格式与转义集中到 `plugin/AuditFormat`，用不可变 `DateTimeFormatter`（线程安全）并把 CR/LF 转义为字面量，保证"一次调用 = 一行" |
 
 ## 交付给用户的固定动作
 

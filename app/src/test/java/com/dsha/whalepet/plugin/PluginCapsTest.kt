@@ -68,4 +68,36 @@ class PluginCapsTest {
             assertTrue("能力 $cap 的动作描述为空", desc.isNotBlank())
         }
     }
+
+    // ── 动作↔能力映射（唯一来源，漏登记会被这里抓住）─────────────
+
+    @Test
+    fun everyCapabilityIsReachableFromSomeAction() {
+        val actions = listOf("say", "notify", "vibrate", "openUrl", "openApp", "shizuku")
+        assertEquals(
+            "PluginCaps.ALL 与 ofAction 的映射不一致：新增能力后忘了登记动作",
+            PluginCaps.ALL,
+            actions.map { PluginCaps.ofAction(it) }.toSet()
+        )
+    }
+
+    @Test
+    fun unknownOrLogActionNeedsNoCapability() {
+        assertEquals("", PluginCaps.ofAction("log"))
+        assertEquals("", PluginCaps.ofAction("teleport"))
+        assertEquals("", PluginCaps.ofAction(""))
+    }
+
+    @Test
+    fun pluginActionCapabilityUsesTheSameMapping() {
+        // 两处若各写一份 when，容易出现"声明了能力却永远被判未授权"
+        listOf("say", "notify", "vibrate", "openUrl", "openApp", "shizuku", "log", "unknown")
+            .forEach { type ->
+                assertEquals(
+                    "动作 $type 的能力映射不一致",
+                    PluginCaps.ofAction(type),
+                    PluginAction(type = type).capability
+                )
+            }
+    }
 }

@@ -7,6 +7,7 @@ import org.mozilla.javascript.ContextFactory
 import org.mozilla.javascript.Function
 import org.mozilla.javascript.Scriptable
 import org.mozilla.javascript.ScriptableObject
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
 /**
@@ -30,7 +31,14 @@ object PluginEngine {
 
     private class Loaded(val plugin: Plugin, val scope: Scriptable, val scriptHash: Int)
 
-    private val loaded = mutableMapOf<String, Loaded>()
+    /**
+     * 已加载插件：id → 作用域 + 脚本 hash。
+     *
+     * 用 [ConcurrentHashMap] 而不是普通 Map：写入发生在 `whale-plugin` 线程，
+     * 而 [isLoaded] / [isLoadedFresh] 由**主线程**在每次 `dispatch` 时调用，
+     * 普通 HashMap 在并发读写下可能返回错值或抛异常。
+     */
+    private val loaded = ConcurrentHashMap<String, Loaded>()
 
     /** 单线程执行器：所有脚本（加载与事件）都在这条线程上串行跑。 */
     private val executor = Executors.newSingleThreadExecutor { r ->
