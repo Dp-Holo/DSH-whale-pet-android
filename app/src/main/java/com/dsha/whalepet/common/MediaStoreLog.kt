@@ -132,8 +132,10 @@ object MediaStoreLog {
                 }
                 kept
             }
-            uriCache[fileName] = uri
-            uri
+            // insert 可能返回 null（系统拒绝等），此时不缓存、也不视为成功
+            val resolved = uri ?: return null
+            uriCache[fileName] = resolved
+            resolved
         } catch (_: Throwable) {
             null
         }
