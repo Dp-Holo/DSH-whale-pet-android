@@ -46,5 +46,21 @@ data class ShizukuResult(val outcome: Outcome, val message: String) {
             }
             return ShizukuResult(outcome, text)
         }
+
+        /**
+         * 由 App 侧的结构化结果映射（1.1.47 起 `PluginAppBridge.shizukuStructured()` 提供）。
+         *
+         * 迁移到这个入口后，宿主不必再自己解析文案——归类规则由**真正知道文案含义**的
+         * App 侧维护（`common/ShizukuOutcome`）。[classify] 只作为没有结构化通道时的兜底。
+         */
+        fun from(appOutcome: com.dsha.whalepet.common.ShizukuOutcome): ShizukuResult =
+            ShizukuResult(
+                outcome = when {
+                    appOutcome.success -> Outcome.OK
+                    appOutcome.denied -> Outcome.DENIED
+                    else -> Outcome.ERROR
+                },
+                message = appOutcome.message
+            )
     }
 }

@@ -1,5 +1,6 @@
 package com.dsha.whalepet.plugin
 
+import com.dsha.whalepet.common.ShizukuOutcome
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -64,5 +65,38 @@ class ShizukuResultTest {
         val r = ShizukuResult.classify("  拒绝执行：命令不在白名单内  ")
         assertEquals("拒绝执行：命令不在白名单内", r.message)
         assertTrue("原文要保留，便于排查", r.message.isNotBlank())
+    }
+
+    // ── 结构化入口（App 侧 1.1.47 起提供，宿主不再自己猜文案）────────
+
+    @Test
+    fun structuredSuccessMapsToOk() {
+        val r = ShizukuResult.from(ShizukuOutcome(success = true, denied = false, message = "exit=0"))
+        assertEquals(ShizukuResult.Outcome.OK, r.outcome)
+        assertEquals("ok", r.auditResult)
+    }
+
+    @Test
+    fun structuredDeniedMapsToDenied() {
+        val r = ShizukuResult.from(
+            ShizukuOutcome(success = false, denied = true, message = "拒绝执行：命令不在白名单内")
+        )
+        assertEquals(ShizukuResult.Outcome.DENIED, r.outcome)
+        assertEquals("denied", r.auditResult)
+    }
+
+    @Test
+    fun structuredFailureMapsToError() {
+        val r = ShizukuResult.from(
+            ShizukuOutcome(success = false, denied = false, message = "执行异常：SecurityException")
+        )
+        assertEquals(ShizukuResult.Outcome.ERROR, r.outcome)
+        assertEquals("error", r.auditResult)
+    }
+
+    @Test
+    fun structuredPathKeepsMessageVerbatim() {
+        // 归类交给 App 侧，宿主只负责把原文带进审计
+        assertEquals("原始文本", ShizukuResult.from(ShizukuOutcome(true, false, "原始文本")).message)
     }
 }

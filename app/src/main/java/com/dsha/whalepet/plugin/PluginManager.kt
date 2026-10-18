@@ -246,16 +246,36 @@ object PluginManager {
     fun granted(ctx: Context, pluginId: String): Set<String> =
         readMap(ctx, KEY_GRANTS)[pluginId] ?: emptySet()
 
+    /**
+     * 保存该插件的授权：**全量替换**，不是追加。
+     *
+     * 授权框会把已授权项预勾选，用户取消勾选后点保存。只做 `addAll` 的话，
+     * 被取消的能力依然有效——用户以为收回了权限，实际没有（授权 UI 与安全语义背离）。
+     */
     fun grant(ctx: Context, pluginId: String, caps: Collection<String>) {
-        // 空集合直接忽略：写入它只会留下一条"授权能力为空"的误导性审计，
-        // 语义上也等于没授权（UI 层已挡，这里是公共 API 的兜底）。
-        if (caps.isEmpty()) return
+        // 空选择：不写入、保持现状（UI 已挡，这里是公共 API 的兜底）
+        val selected = GrantPolicy.replaceWith(caps) ?: return
+
         val map = readMap(ctx, KEY_GRANTS)
-        val cur = map[pluginId] ?: mutableSetOf()
-        cur.addAll(caps)
-        map[pluginId] = cur
+        val before = map[pluginId]?.toSet() ?: emptySet()
+        map[pluginId] = selected.toMutableSet()
         writeMap(ctx, KEY_GRANTS, map)
-        audit(ctx, pluginId, "grant", "授权能力：${caps.joinToString(", ")}", "ok")
+
+        // 授权收缩后要同步丢弃超出范围的"始终允许"，
+        // 否则用户重新勾上时会被上一轮的免询问决定直接放过
+        val always = readMap(ctx, KEY_ALWAYS)
+        always[pluginId]?.let { cur ->
+            val pruned = GrantPolicy.pruneAlways(cur, selected)
+            if (pruned.isEmpty()) always.remove(pluginId) else always[pluginId] = pruned.toMutableSet()
+            writeMap(ctx, KEY_ALWAYS, always)
+        }
+
+        val revoked = before - selected
+        val detail = buildString {
+            append("授权能力：").append(selected.joinToString(", "))
+            if (revoked.isNotEmpty()) append("（撤销：").append(revoked.joinToString(", ")).append("）")
+        }
+        audit(ctx, pluginId, "grant", detail, "ok")
     }
 
     /** 撤销该插件的全部授权（含"始终允许"记录）。 */

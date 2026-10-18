@@ -80,11 +80,11 @@ internal class PluginHostImpl(
     override fun pluginOpenApp(pkg: String): Boolean = bridge.openApp(pkg)
 
     /**
-     * App 侧只返回一段人可读文本（跨边界签名不动），这里就地归类。
-     * 归类后审计才能区分"白名单拒绝"与"真的执行了"。
+     * 走 App 侧的**结构化**入口（1.1.47 起可用），不再由宿主自己解析返回文案。
+     * 归类规则由 App 侧维护，文案改动不会让审计退化。
      */
     override fun pluginShizuku(args: List<String>): ShizukuResult =
-        ShizukuResult.classify(bridge.shizuku(args))
+        ShizukuResult.from(bridge.shizukuStructured(args))
 
     override fun pluginConfirm(
         pluginName: String,

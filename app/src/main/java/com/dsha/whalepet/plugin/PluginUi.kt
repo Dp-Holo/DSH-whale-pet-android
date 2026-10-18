@@ -108,8 +108,9 @@ object PluginUi {
             .setPositiveButton(R.string.save) { _, _ ->
                 val toGrant = caps.filterIndexed { i, _ -> checked[i] }
                 if (toGrant.isEmpty()) {
-                    // 空选择：不写入授权，明确告知（此前会提示"已授权"，属误导）
-                    Toast.makeText(activity, R.string.plugin_caps_none, Toast.LENGTH_SHORT).show()
+                    // 空选择：不写入授权，明确告知"你没选"
+                    // （此前复用 plugin_caps_none「未声明能力」，读起来像在说插件有问题）
+                    Toast.makeText(activity, R.string.plugin_none_selected, Toast.LENGTH_SHORT).show()
                 } else {
                     PluginManager.grant(activity, p.id, toGrant)
                     val text = toGrant.joinToString("、") { PluginCaps.label(it) }
