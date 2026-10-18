@@ -128,6 +128,9 @@ on('balanceDecreased', function (ctx) {
 
 **重要**：敏感能力是**异步确认**的 —— `openApp()` 返回 `pending` 不代表已打开，真正打开发生在用户点「允许」之后。
 
+**返回值类型**：上表所有能力的返回值都是**普通 JS 字符串**，可以直接比较：
+`if (say('hi') === 'ok') { … }`。
+
 ---
 
 ## 4. 用户侧的授权与确认（插件作者必须理解）
@@ -171,7 +174,8 @@ on('balanceDecreased', function (ctx) {
 
 **不可用（会抛错或被拒绝）**：
 - ❌ 任何 Java 类：`Packages`、`java`、`javax`、`org`、`com`… 全局已删除
-- ❌ `__bridge.getClass()` / `getClassLoader()` 等反射逃逸（ClassShutter 只放行 `__bridge` 本身）
+- ❌ `__bridge.getClass()` / `getClassLoader()` 等反射逃逸（白名单只放行 `__bridge` 与
+  `java.lang.String`；反射的必经节点 `java.lang.Class` / `ClassLoader` 一律被拒）
 - ❌ 文件读写、网络请求（未提供对应 API）
 - ❌ 其它插件的作用域（每个插件独立作用域，互不可见）
 
@@ -244,6 +248,7 @@ MM-dd HH:mm:ss | 插件id | 事件或动作类别 | 动作描述 | 结果 | 详�
 | 1.1.40 | 移除从未生效的 `intervalMs` | 该字段被忽略；**定时事件不支持** |
 | 1.1.42 | 授权变更后点「允许」会复查；确认结束原因细分；`shizuku` 结果按真实情况记；规则动作 1 秒下限；启停/删除写审计 | 敏感动作可能因"授权已变更"被拒 |
 | 1.1.47 | 授权框改为**全量替换**（取消勾选真正生效）；被撤销能力的"始终允许"一并清除；处理函数抛异常与非正常中止都会写审计 | 取消勾选后对应能力立刻失效；调试时能在日志看到报错原因 |
+| 1.1.47-Extension | 修正沙箱白名单：放行 `java.lang.String`；能力返回值转为普通 JS 字符串 | 1.1.29 起"能力生效但脚本随即被中断"的问题修复；`say(...) === 'ok'` 这类比较现在成立 |
 
 > 1.1.47 起沙箱与指令上限有 JVM 回归测试（`ScriptSandboxTest`），
 > 不再只依赖 `docs/probes/` 的人工探针。

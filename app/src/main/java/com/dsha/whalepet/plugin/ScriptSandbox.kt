@@ -67,6 +67,21 @@ object ScriptSandbox {
     )
 
     /**
+     * 除 bridge 之外**必须**放行的 JDK 类型。
+     *
+     * `java.lang.String` 是必需的：bridge 的每个能力都返回 String，Rhino 在包装返回值时
+     * 会为 `java.lang.String` 建 JavaMembers。只放行 bridge 一个类，就会在
+     * **副作用已经发生之后**抛
+     * `Access to Java class "java.lang.String" is prohibited`——
+     * 表现为"能力调用了、桌面反应了，但脚本随即被中断"，而且错误被脚本层的
+     * `try/catch` 吞掉、日志里什么都看不到（1.1.29 ~ 1.1.47 一直踩这个坑）。
+     *
+     * 放行 String **不构成逃逸**：反射逃逸的必经节点是 `java.lang.Class` / `ClassLoader`，
+     * 它们仍不在白名单里（`String.getClass()` 会拿到 Class → 被拦）。
+     */
+    private val ALLOWED_JDK_TYPES = setOf("java.lang.String")
+
+    /**
      * 宿主胶水：脚本可见的唯一入口函数集合。
      *
      * `__fire` 会把每个处理函数的异常**收集起来返回**，而不是就地吞掉——
@@ -79,17 +94,17 @@ object ScriptSandbox {
             (__handlers[event] = __handlers[event] || []).push(handler);
           }
         }
-        function say(t) { return __bridge.say(String(t)); }
-        function notify(t, m) { return __bridge.notify(String(t), String(m == null ? '' : m)); }
-        function vibrate(ms) { return __bridge.vibrate(String(ms)); }
-        function openUrl(u) { return __bridge.openUrl(String(u)); }
-        function openApp(p) { return __bridge.openApp(String(p)); }
+        function say(t) { return String(__bridge.say(String(t))); }
+        function notify(t, m) { return String(__bridge.notify(String(t), String(m == null ? '' : m))); }
+        function vibrate(ms) { return String(__bridge.vibrate(String(ms))); }
+        function openUrl(u) { return String(__bridge.openUrl(String(u))); }
+        function openApp(p) { return String(__bridge.openApp(String(p))); }
         function shizuku() {
           var a = [];
           for (var i = 0; i < arguments.length; i++) { a.push(String(arguments[i])); }
-          return __bridge.shizuku(a.join('\u0001'));
+          return String(__bridge.shizuku(a.join('\u0001')));
         }
-        function log(t) { return __bridge.log(String(t)); }
+        function log(t) { return String(__bridge.log(String(t))); }
         function __fire(event, payloadJson) {
           var list = __handlers[event] || [];
           var data = {};
@@ -144,17 +159,18 @@ object ScriptSandbox {
     }
 
     /**
-     * 每个脚本一个工厂：白名单绑定到它自己的 bridge 类，互不影响。
+     * 每个脚本一个工厂：白名单绑定到它自己的 bridge 类（外加 [ALLOWED_JDK_TYPES]），互不影响。
      *
      * 用 `enterContext()`/`Context.exit()` 成对包裹，每次执行都会新建 Context，
      * 因此指令计数不会跨次累积（否则一次超时会把后续执行全部毒化）。
      */
-    private fun newFactory(allowedClass: String, state: RunState): ContextFactory =
-        object : ContextFactory() {
+    private fun newFactory(bridgeClass: String, state: RunState): ContextFactory {
+        val allowed: Set<String> = ALLOWED_JDK_TYPES + bridgeClass
+        return object : ContextFactory() {
             override fun makeContext(): Context {
                 val cx = super.makeContext()
                 cx.optimizationLevel = -1
-                cx.setClassShutter(ClassShutter { className -> className == allowedClass })
+                cx.setClassShutter(ClassShutter { className -> allowed.contains(className) })
                 cx.setInstructionObserverThreshold(MAX_INSTRUCTIONS_PER_RUN)
                 return cx
             }
@@ -164,4 +180,5 @@ object ScriptSandbox {
                 throw TimeoutError()
             }
         }
+    }
 }

@@ -28,6 +28,32 @@ class ScriptSandboxTest {
         assertEquals(listOf("say:hi"), bridge.calls)
     }
 
+    /**
+     * 回归：能力返回值必须是**普通 JS 字符串**，而不是包裹 Java String 的 NativeJavaObject。
+     *
+     * 1.1.29 ~ 1.1.47 的 bug：白名单只放行 bridge，Rhino 包装 String 返回值时为
+     * `java.lang.String` 建 JavaMembers 被拒 → 副作用已经发生、脚本随即抛错并被
+     * `__fire` 的 catch 吞掉。表现是"能力生效了但后续脚本不执行"，日志里毫无痕迹。
+     */
+    @Test
+    fun bridgeReturnValuesArePlainJsStrings() {
+        val bridge = FakeBridge()
+        ScriptSandbox.compile(
+            bridge,
+            "var r = say('x'); say(typeof r + '/' + String(r === 'ok'));",
+            "t"
+        )
+        assertEquals(listOf("say:x", "say:string/true"), bridge.calls)
+    }
+
+    @Test
+    fun bridgeCallAtLoadTimeDoesNotBreak() {
+        // 加载阶段（compile 内）调用能力同样不能触发 String 包装被拒
+        val bridge = FakeBridge()
+        ScriptSandbox.compile(bridge, "say('at-load');", "t")
+        assertEquals(listOf("say:at-load"), bridge.calls)
+    }
+
     @Test
     fun dangerousGlobalsAreGone() {
         val bridge = FakeBridge()
