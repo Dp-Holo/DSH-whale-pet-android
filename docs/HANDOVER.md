@@ -143,6 +143,7 @@ app/src/main/aidl/…/IShizukuCommand.aidl
 | 更多事件源 | 前台应用切换、充电开始/结束、整点 |
 | 插件导入/导出 | 目前靠"粘贴 JSON"，可加系统文件选择器（SAF）导入 |
 | ~~脚本执行时限~~ | **已完成（1.1.29）**。原判断"当前 Rhino 版本无该 API"是**错的**：`rhino-android:1.6.0` 只是适配层，真正依赖是传递引入的 `org.mozilla:rhino-runtime:1.7.13`，该版本有 `ContextFactory.observeInstructionCount` + `Context.setInstructionObserverThreshold`。现已启用（单次 500 万条指令，超时抛 `java.lang.Error`） |
+| ~~真机探针（沙箱 / 死循环 / 未授权拦截）~~ | **已完成（2026-10-18，App 1.1.47）**：三项全部通过，实测记录见 `docs/probes/README.md` |
 | i18n | 目前仅中文 |
 
 ---
