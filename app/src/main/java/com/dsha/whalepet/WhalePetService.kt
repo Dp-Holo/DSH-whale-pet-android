@@ -3,6 +3,7 @@ package com.dsha.whalepet
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -384,12 +385,22 @@ class WhalePetService : Service() {
                 }
             )
         }
+        // 通知文案写着"点按打开设置"，就必须真的能点开（此前没有 contentIntent，点了没反应）
+        val contentIntent = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java).addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            ),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
         val notification: Notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, channelId)
                 .setContentTitle(getString(R.string.notif_title))
                 .setContentText(getString(R.string.notif_text))
                 .setSmallIcon(R.drawable.ic_launcher_foreground)
                 .setOngoing(true)
+                .setContentIntent(contentIntent)
                 .build()
         } else {
             @Suppress("DEPRECATION")
@@ -398,6 +409,7 @@ class WhalePetService : Service() {
                 .setContentText(getString(R.string.notif_text))
                 .setSmallIcon(R.drawable.ic_launcher_foreground)
                 .setOngoing(true)
+                .setContentIntent(contentIntent)
                 .build()
         }
         // Android 14+ 需要声明 specialUse 前台服务类型（Manifest 已声明）
@@ -516,7 +528,7 @@ class WhalePetService : Service() {
                 clamp()
                 overlayParams.x = x.roundToInt()
                 overlayParams.y = y.roundToInt()
-                wm.updateViewLayout(rootView, overlayParams)
+                safeUpdateLayout()
                 if (bubbleVisible) positionBubbleWindow()
                 true
             }
@@ -627,7 +639,7 @@ class WhalePetService : Service() {
         bubbleParams.y = (y + imgPad - contentH - (3 * dm.density)).toInt()
             .coerceAtLeast(0)
         try {
-            wm.updateViewLayout(bubbleWin, bubbleParams)
+            runCatching { wm.updateViewLayout(bubbleWin, bubbleParams) }
         } catch (_: Exception) {
         }
     }
@@ -676,6 +688,22 @@ class WhalePetService : Service() {
         frameCallback = null
     }
 
+    /**
+     * 安全地更新鲸鱼主窗口的布局。
+     *
+     * 悬浮窗权限被撤销、或窗口已被系统移除后，updateViewLayout 会抛异常；
+     * 而它由游动循环每帧调用 → 未捕获会直接把服务崩掉（权限撤销 = 必崩）。
+     * 这里兜底：失败即停止游动并结束服务，等用户重新授权后再启动。
+     */
+    private fun safeUpdateLayout() {
+        try {
+            safeUpdateLayout()
+        } catch (_: Throwable) {
+            stopWander()
+            stopSelf()
+        }
+    }
+
     private fun stepWander(scale: Float = 1f) {
         if (dragging) return
         val speed = speedPx
@@ -692,7 +720,7 @@ class WhalePetService : Service() {
         // 四舍五入取整：避免亚像素累加被截断造成逐帧 ±1px 跳动
         overlayParams.x = x.roundToInt()
         overlayParams.y = y.roundToInt()
-        wm.updateViewLayout(rootView, overlayParams)
+        safeUpdateLayout()
         if (bubbleVisible) positionBubbleWindow()
         // 临时诊断：每约 30 秒记录一行（按时间累计，避免高刷屏上触发过频）
         debugTickMs += scale * 16.67f
@@ -780,7 +808,7 @@ class WhalePetService : Service() {
         overlayParams.x = probeX
         overlayParams.y = probeY
         try {
-            wm.updateViewLayout(rootView, overlayParams)
+            safeUpdateLayout()
         } catch (_: Exception) {
             computeSafeBounds()
             boundsReady = true
@@ -807,7 +835,7 @@ class WhalePetService : Service() {
             overlayParams.y = y.roundToInt()
             overlayParams.alpha = 1f
             try {
-                wm.updateViewLayout(rootView, overlayParams)
+                safeUpdateLayout()
             } catch (_: Exception) {
             }
             dumpDebug("calibrated")
@@ -1090,9 +1118,11 @@ class WhalePetService : Service() {
                 }
                 // 诊断：仅在数值变化/首次/触发时记录，避免刷屏
                 if (prev == null || amount.value != prev || decreased) {
+                    // 不记录具体金额：诊断只需要"是否变化/是否触发"，
+                    // 余额属于财务数据，不应长期留在共享下载目录。
                     dumpDebug(
-                        "tokenWatch: value=${amount.value} prev=${prev ?: -1.0} " +
-                            "cur=${amount.currency} prevCur=${prevCurrency ?: "-"} " +
+                        "tokenWatch: changed=${prev != null} cur=${amount.currency} " +
+                            "prevCur=${prevCurrency ?: "-"} " +
                             "triggered=$decreased shown=$shown"
                     )
                 }

@@ -13,7 +13,7 @@ android {
         targetSdk = 35
         // CI（GitHub Actions）里取 run number 保证每次发版 versionCode 递增；本地构建回退 1
         versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toIntOrNull() ?: 1
-        versionName = "1.1.43"
+        versionName = "1.1.44"
     }
 
     // 正式签名：keystore 由 CI 从 Actions secrets 注入（KEYSTORE_PATH 等环境变量）；
@@ -74,6 +74,11 @@ dependencies {
     implementation("dev.rikka.shizuku:provider:13.1.5")
     // 插件脚本引擎：Android 版 Rhino（纯 Java，无需 NDK/JNI）
     implementation("com.faendir.rhino:rhino-android:1.6.0")
+    // 强制升级 Rhino 运行时：rhino-android:1.6.0 传递引入的 rhino-runtime:1.7.13
+    // 命中 CVE-2025-66453（攻击者控制的浮点数传给 toFixed 会触发天文数字次幂运算，
+    // 单次 Java 调用内完成，JS 指令上限拦不住 → 插件线程被永久占死）。
+    // 1.7.15.1 起修复；这里显式覆盖传递依赖的版本。
+    implementation("org.mozilla:rhino-runtime:1.7.15.1")
     // 余额查询走系统 HttpURLConnection（零三方依赖）
 
     // 单元测试（JVM）：Android 内置的 org.json 在测试环境不存在，需单独引入实现
