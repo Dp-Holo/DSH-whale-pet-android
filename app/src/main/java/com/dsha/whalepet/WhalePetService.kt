@@ -19,6 +19,7 @@ import android.os.Looper
 import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.view.Choreographer
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -74,8 +75,12 @@ class WhalePetService : Service() {
     private lateinit var whaleImg: ImageView
 
     private val handler = Handler(Looper.getMainLooper())
-    private var wanderRunnable: Runnable? = null
     private var wanderRunning = false
+    /** 漫游帧回调（Choreographer，对齐 vsync；比固定 16ms Handler 更省电、帧率更稳） */
+    private var frameCallback: Choreographer.FrameCallback? = null
+    private var lastFrameNanos = 0L
+    /** 诊断 tick 的毫秒累计（改用时间而非帧数，避免高刷屏上日志变频繁） */
+    private var debugTickMs = 0f
     private var balanceRunnable: Runnable? = null
     // 余额消耗检测（每 3 秒静默查询，结果不显示）
     private var tokenWatchRunnable: Runnable? = null
@@ -632,23 +637,35 @@ class WhalePetService : Service() {
     private fun startWander() {
         if (wanderRunning) return
         wanderRunning = true
-        wanderRunnable = object : Runnable {
-            override fun run() {
-                stepWander()
-                handler.postDelayed(this, 16L)
+        lastFrameNanos = 0L
+        val cb = object : Choreographer.FrameCallback {
+            override fun doFrame(frameTimeNanos: Long) {
+                if (!wanderRunning) return
+                // 按真实帧间隔缩放位移：60Hz 时约 1.0；120Hz 屏不会变快；
+                // 掉帧或系统降频时单帧位移上限 3 倍，避免"一跳很远"。
+                val dtMs = if (lastFrameNanos == 0L) {
+                    16.67f
+                } else {
+                    (frameTimeNanos - lastFrameNanos) / 1_000_000f
+                }
+                lastFrameNanos = frameTimeNanos
+                val scale = (dtMs / 16.67f).coerceIn(0.25f, 3f)
+                stepWander(scale)
+                Choreographer.getInstance().postFrameCallback(this)
             }
         }
-        handler.postDelayed(wanderRunnable!!, 16L)
+        frameCallback = cb
+        Choreographer.getInstance().postFrameCallback(cb)
     }
 
     /** 暂停游动（息屏 / 服务销毁），避免无谓的动画与重绘。 */
     private fun stopWander() {
         wanderRunning = false
-        wanderRunnable?.let(handler::removeCallbacks)
-        wanderRunnable = null
+        frameCallback?.let { Choreographer.getInstance().removeFrameCallback(it) }
+        frameCallback = null
     }
 
-    private fun stepWander() {
+    private fun stepWander(scale: Float = 1f) {
         if (dragging) return
         val speed = speedPx
         // 随机偏转幅度收敛（0.06 → 0.02）：低速时最容易看出抖动，进一步平滑
@@ -658,17 +675,18 @@ class WhalePetService : Service() {
         }
         curVx = cos(angle.toDouble()).toFloat() * speed
         curVy = sin(angle.toDouble()).toFloat() * speed
-        x += curVx
-        y += curVy
+        x += curVx * scale
+        y += curVy * scale
         clamp()
         // 四舍五入取整：避免亚像素累加被截断造成逐帧 ±1px 跳动
         overlayParams.x = x.roundToInt()
         overlayParams.y = y.roundToInt()
         wm.updateViewLayout(rootView, overlayParams)
         if (bubbleVisible) positionBubbleWindow()
-        // 临时诊断：每约 30 秒记录一行（避免文件增长过快）
-        if (++debugTick >= 1800) {
-            debugTick = 0
+        // 临时诊断：每约 30 秒记录一行（按时间累计，避免高刷屏上触发过频）
+        debugTickMs += scale * 16.67f
+        if (debugTickMs >= 30_000f) {
+            debugTickMs = 0f
             dumpDebug("tick")
         }
         // 朝向：滞回阈值提高（0.2 → 0.35 倍速）+ 动画过渡，
@@ -923,7 +941,6 @@ class WhalePetService : Service() {
     // ── 运行时诊断（写入 Download/whale-debug.txt，便于问题追溯）──
     // 文件写入规则（同名变体归并、1MB 自清除、只处理本应用文件）集中在
     // common/MediaStoreLog，与插件审计日志共用同一套实现。
-    private var debugTick = 0
     private val DEBUG_FILE_NAME = "whale-debug.txt"
 
     /** 记录一行运行时状态到 Download/whale-debug.txt。 */
