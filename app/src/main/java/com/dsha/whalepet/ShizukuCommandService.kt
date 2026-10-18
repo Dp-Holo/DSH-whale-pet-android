@@ -14,25 +14,29 @@ class ShizukuCommandService : IShizukuCommand.Stub() {
         // 防止未来任何调用方借该通道执行任意 shell 命令。
         if (!isAllowed(args)) return -1
         return try {
-            val p = Runtime.getRuntime().exec(args)
+            val p = ProcessBuilder(*args).redirectErrorStream(true).start()
+            p.outputStream.close()          // 命令不需要 stdin，先关闭
+            // 必须先把输出读空再 waitFor：否则输出超过管道缓冲区时
+            // 子进程会阻塞在写、父进程阻塞在 waitFor，形成死锁。
+            p.inputStream.bufferedReader().use { it.readText() }
             p.waitFor()
         } catch (e: Exception) {
             -1
         }
     }
 
-    /** 执行并回传退出码 + stdout/stderr，便于诊断授权失败的真实原因。 */
+    /** 执行并回传退出码 + 输出，便于诊断授权失败的真实原因。 */
     override fun run(args: Array<String>): String {
         if (!isAllowed(args)) return "拒绝执行：命令不在白名单内"
         return try {
-            val p = Runtime.getRuntime().exec(args)
+            // 合并 stderr 到 stdout 后一次读完，避免「先读一个流、另一个流先满」造成的死锁
+            val p = ProcessBuilder(*args).redirectErrorStream(true).start()
+            p.outputStream.close()
             val out = p.inputStream.bufferedReader().use { it.readText() }.trim()
-            val err = p.errorStream.bufferedReader().use { it.readText() }.trim()
             val code = p.waitFor()
             buildString {
                 append("exit=").append(code)
-                if (out.isNotEmpty()) append(" | out: ").append(out.take(200))
-                if (err.isNotEmpty()) append(" | err: ").append(err.take(200))
+                if (out.isNotEmpty()) append(" | out: ").append(out.take(400))
             }
         } catch (t: Throwable) {
             "执行异常：${t.message ?: t.javaClass.simpleName}"

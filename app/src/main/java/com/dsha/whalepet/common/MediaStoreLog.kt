@@ -43,14 +43,30 @@ object MediaStoreLog {
     @Synchronized
     fun append(ctx: Context, fileName: String, text: String, rolloverMark: String): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
+        // 按 UTF-8 **字节数**判断，而不是字符数：中文一个字符占 3 字节，
+        // 用 text.length 会把 1MB 上限估算成实际可写约 3MB。
+        val bytes = text.toByteArray()
+        if (writeOnce(ctx, fileName, bytes, rolloverMark)) return true
+        // 首次失败后清缓存再试一次：用户可能在文件管理器里删掉了日志文件，
+        // 缓存里的 uri 已失效；不清缓存会导致日志静默丢失直到进程重启。
+        uriCache.remove(fileName)
+        return writeOnce(ctx, fileName, bytes, rolloverMark)
+    }
+
+    private fun writeOnce(
+        ctx: Context,
+        fileName: String,
+        bytes: ByteArray,
+        rolloverMark: String
+    ): Boolean {
         return try {
             val uri = ensureUri(ctx, fileName) ?: return false
-            val truncate = size(ctx, fileName) + text.length > MAX_BYTES
+            val truncate = size(ctx, fileName) + bytes.size > MAX_BYTES
             ctx.contentResolver.openOutputStream(uri, if (truncate) "wt" else "wa")?.use { os ->
                 if (truncate) {
                     os.write((rolloverMark + "\n").toByteArray())
                 }
-                os.write(text.toByteArray())
+                os.write(bytes)
             }
             true
         } catch (_: Throwable) {

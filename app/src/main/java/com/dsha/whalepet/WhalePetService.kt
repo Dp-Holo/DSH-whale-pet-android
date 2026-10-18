@@ -35,6 +35,7 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
+import java.util.Locale
 
 /**
  * 悬浮窗鲸鱼娘桌宠服务。
@@ -58,6 +59,9 @@ class WhalePetService : Service() {
         /**「正在偷吃用户token...」显示节流：10 秒内最多一次 */
         private const val TOKEN_NIBBLE_COOLDOWN_MS = 10_000L
 
+        /** 余额查询失败的日志节流：断网时避免每 3 秒写一行把日志刷爆 */
+        private const val TOKEN_FAIL_LOG_INTERVAL_MS = 60_000L
+
         /** 插件通知渠道与通知 id */
         private const val PLUGIN_CHANNEL_ID = "whale_plugin_channel"
         private const val PLUGIN_NOTIF_ID = 2
@@ -73,12 +77,17 @@ class WhalePetService : Service() {
     private var wanderRunnable: Runnable? = null
     private var wanderRunning = false
     private var balanceRunnable: Runnable? = null
-    // 余额消耗检测（每 10 秒静默查询，结果不显示）
+    // 余额消耗检测（每 3 秒静默查询，结果不显示）
     private var tokenWatchRunnable: Runnable? = null
     private var lastBalanceValue: Double? = null
     private var lastBalanceCurrency: String? = null
     private var lastTokenNibbleAt = 0L
     private var debugTokenNoKey = false
+    /** 上一次余额请求还没回来（超时 8 秒 > 间隔 3 秒，需要防重叠） */
+    private var tokenWatchInFlight = false
+    /** 请求序号：丢弃过期响应，避免乱序覆盖基准值导致误报"余额减少" */
+    private var tokenWatchSeq = 0L
+    private var lastTokenFailLogAt = 0L
     private var badgeTimer: Runnable? = null
     private var bubbleTimer: Runnable? = null
 
@@ -113,6 +122,12 @@ class WhalePetService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        // 悬浮窗权限被撤销时不要再走 addView：否则会抛 BadTokenException，
+        // 若服务被系统重启就会形成"崩溃→重启→再崩溃"的循环。直接结束，等用户重新授权。
+        if (!android.provider.Settings.canDrawOverlays(this)) {
+            stopSelf()
+            return
+        }
         isRunning = true
         wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         startForegroundCompat()
@@ -125,6 +140,12 @@ class WhalePetService : Service() {
         // 插件宿主启动：App 只交出基础能力，授权/确认/审计由宿主侧负责
         PluginEntry.onServiceStart(this, pluginBridge)
     }
+
+    /**
+     * 显式声明不粘性：服务异常退出后不由系统自动重启。
+     * 这样"权限被撤销 → onCreate 抛异常 → 系统重启"不会再变成崩溃循环。
+     */
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_NOT_STICKY
 
     override fun onDestroy() {
         isRunning = false
@@ -213,7 +234,10 @@ class WhalePetService : Service() {
             } catch (_: Throwable) {
                 return false
             }
-            if (uri.scheme.isNullOrBlank()) return false
+            // 只允许真正的网页链接：file:// 暴露本地文件、content:// 可读他人数据、
+            // intent: 能间接拉起任意组件，都不该借"打开网页"这个名义触发。
+            val scheme = uri.scheme?.lowercase()
+            if (scheme != "http" && scheme != "https") return false
             handler.post {
                 try {
                     startActivity(
@@ -406,7 +430,14 @@ class WhalePetService : Service() {
             y = dm.heightPixels - win - (60 * dm.density).toInt()
         }
         whaleImg.setOnTouchListener(whaleTouch)
-        wm.addView(rootView, overlayParams)
+        // 权限可能在服务启动后、addView 之前被撤销（例如用户在系统设置里收回），
+        // 这里兜底捕获 BadTokenException，避免整个服务崩溃。
+        try {
+            wm.addView(rootView, overlayParams)
+        } catch (t: Throwable) {
+            stopSelf()
+            return
+        }
 
         this.x = overlayParams.x.toFloat()
         this.y = overlayParams.y.toFloat()
@@ -907,7 +938,7 @@ class WhalePetService : Service() {
                 "bounds=[$boundMinX,$boundMinY,$boundMaxX,$boundMaxY] " +
                 "param=[${overlayParams.x},${overlayParams.y}] loc=[${loc[0]},${loc[1]}] " +
                 "xy=[${x.roundToInt()},${y.roundToInt()}] " +
-                "angle=${"%.3f".format(angle)} drag=$dragging\n"
+                "angle=${String.format(Locale.ROOT, "%.3f", angle)} drag=$dragging\n"
             appendDebugLine(line)
         } catch (_: Throwable) {
         }
@@ -994,9 +1025,22 @@ class WhalePetService : Service() {
             }
             return
         }
+        // 上一次请求还没回来就跳过本轮：请求超时(8s) 长于间隔(3s)，
+        // 重叠的响应乱序到达会让旧值覆盖新基准，进而误报"余额减少"。
+        if (tokenWatchInFlight) return
+        tokenWatchInFlight = true
+        val seq = ++tokenWatchSeq
         BalanceFetcher.fetchAmountAsync(key) { amount ->
+            // 兜底：丢弃过期响应（seq 不匹配说明已有更新的请求）
+            if (seq != tokenWatchSeq) return@fetchAmountAsync
+            tokenWatchInFlight = false
             if (amount == null) {
-                dumpDebug("tokenWatch: 查询失败（保持基准不变）")
+                // 失败日志节流：断网/飞行模式下每 3 秒写一行会刷爆日志并持续耗电
+                val now = System.currentTimeMillis()
+                if (now - lastTokenFailLogAt >= TOKEN_FAIL_LOG_INTERVAL_MS) {
+                    lastTokenFailLogAt = now
+                    dumpDebug("tokenWatch: 查询失败（保持基准不变）")
+                }
             } else {
                 val prev = lastBalanceValue
                 val prevCurrency = lastBalanceCurrency

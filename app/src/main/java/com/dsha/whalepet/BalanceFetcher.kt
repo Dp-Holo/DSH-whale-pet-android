@@ -4,6 +4,7 @@ import android.os.Handler
 import android.os.Looper
 import org.json.JSONObject
 import java.io.BufferedReader
+import java.util.Locale
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
@@ -31,7 +32,7 @@ object BalanceFetcher {
     }
 
     /**
-     * 仅取余额数值（不展示），用于每 10 秒的静默检测；
+     * 仅取余额数值（不展示），用于每 3 秒的静默检测；
      * 网络失败/无数据时回调 null。
      */
     fun fetchAmountAsync(apiKey: String, onResult: (Amount?) -> Unit) {
@@ -107,7 +108,7 @@ object BalanceFetcher {
     /** 如 "4.65" + CNY → "余额 4.65 元" */
     private fun format(balance: String, currency: String): String {
         val num = balance.toDoubleOrNull()
-        val text = if (num != null) String.format("%.2f", num) else balance
+        val text = if (num != null) String.format(Locale.ROOT, "%.2f", num) else balance
         val unit = if (currency.equals("CNY", true)) "元" else " $currency"
         return "余额 $text$unit"
     }

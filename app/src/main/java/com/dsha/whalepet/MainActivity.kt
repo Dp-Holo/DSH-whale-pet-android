@@ -25,7 +25,7 @@ import com.dsha.whalepet.plugin.PluginEntry
 import com.google.android.material.color.MaterialColors
 
 /**
- * 主界面：底部导航栏分两页。
+ * 主界面：底部导航栏分三页（主页 / 台词管理 / 设置）。
  *  - 第一页（设置）：悬浮窗权限、DeepSeek API Key、启停桌宠
  *  - 第二页（台词管理）：条目列表，🖊 编辑 / ❌ 删除（二次确认）/ ➕ 添加
  *
