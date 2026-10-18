@@ -106,6 +106,9 @@ object BalanceFetcher {
     }
 
     /** 如 "4.65" + CNY → "余额 4.65 元" */
+    /** 供检测逻辑复用同一套余额显示格式（如「余额 7.56 元」）。 */
+    fun formatAmount(amount: Amount): String = format(amount.value.toString(), amount.currency)
+
     private fun format(balance: String, currency: String): String {
         val num = balance.toDoubleOrNull()
         val text = if (num != null) String.format(Locale.ROOT, "%.2f", num) else balance

@@ -56,10 +56,14 @@ class WhalePetService : Service() {
         var isRunning: Boolean = false
 
         /** 余额静默检测间隔：3 秒（熄屏期间整体暂停，亮屏恢复） */
-        private const val TOKEN_WATCH_INTERVAL_MS = 3_000L
+        /** 余额变化探测间隔：无变化时每 5 秒一次 */
+        private const val TOKEN_WATCH_INTERVAL_MS = 5_000L
 
-        /**「正在偷吃用户token...」显示节流：10 秒内最多一次 */
-        private const val TOKEN_NIBBLE_COOLDOWN_MS = 10_000L
+        /** 检测到余额变化后的冷却：1 分钟内不再探测 */
+        private const val TOKEN_COOLDOWN_AFTER_CHANGE_MS = 60_000L
+
+        /** 气泡显示时长（2.2 秒）+ 少量余量，用于「先弹提示、后显示余额」的串行安排 */
+        private const val TOKEN_BUBBLE_DURATION_MS = 2_300L
 
         /** 余额查询失败的日志节流：断网时避免每 3 秒写一行把日志刷爆 */
         private const val TOKEN_FAIL_LOG_INTERVAL_MS = 60_000L
@@ -94,7 +98,6 @@ class WhalePetService : Service() {
     private var tokenWatchRunnable: Runnable? = null
     private var lastBalanceValue: Double? = null
     private var lastBalanceCurrency: String? = null
-    private var lastTokenNibbleAt = 0L
     private var debugTokenNoKey = false
     /** 上一次余额请求还没回来（超时 8 秒 > 间隔 3 秒，需要防重叠） */
     private var tokenWatchInFlight = false
@@ -1062,15 +1065,30 @@ class WhalePetService : Service() {
      */
     private fun scheduleTokenWatch() {
         tokenWatchRunnable = object : Runnable {
-            override fun run() {
-                checkTokenChange()
-                handler.postDelayed(this, TOKEN_WATCH_INTERVAL_MS)
-            }
+            override fun run() = checkTokenChange()
         }
         // 熄屏状态下启动服务时不发请求，等 ACTION_SCREEN_ON 再恢复
         if (isScreenOn()) handler.postDelayed(tokenWatchRunnable!!, TOKEN_WATCH_INTERVAL_MS)
     }
 
+    /** 安排下一次探测：有变化后冷却 1 分钟，无变化继续 5 秒。 */
+    private fun scheduleNextTokenWatch(delayMs: Long) {
+        tokenWatchRunnable?.let {
+            handler.removeCallbacks(it)
+            handler.postDelayed(it, delayMs)
+        }
+    }
+
+    /**
+     * 余额变化探测。
+     *
+     * 节奏（用户指定）：
+     *  - 无变化：每 5 秒探测一次
+     *  - 有变化：先弹「正在偷吃用户token...」（仅余额**减少**时），再显示一次余额，
+     *    然后冷却 1 分钟再探测
+     *  - 余额**增加**（充值）不弹"偷吃"，只把新余额显示一次
+     *  - 查询失败按"无变化"处理（继续 5 秒，失败日志另有节流）
+     */
     private fun checkTokenChange() {
         val key = MainActivity.Prefs.getApiKey(this)
         if (key.isBlank()) {
@@ -1079,56 +1097,62 @@ class WhalePetService : Service() {
                 debugTokenNoKey = true
                 dumpDebug("tokenWatch: API Key 为空，跳过检测")
             }
+            scheduleNextTokenWatch(TOKEN_WATCH_INTERVAL_MS)
             return
         }
-        // 上一次请求还没回来就跳过本轮：请求超时(8s) 长于间隔(3s)，
-        // 重叠的响应乱序到达会让旧值覆盖新基准，进而误报"余额减少"。
-        if (tokenWatchInFlight) return
+        // 上一次请求还没回来就跳过本轮（超时 8s 长于间隔 5s，避免请求叠加）
+        if (tokenWatchInFlight) {
+            scheduleNextTokenWatch(TOKEN_WATCH_INTERVAL_MS)
+            return
+        }
         tokenWatchInFlight = true
         val seq = ++tokenWatchSeq
         BalanceFetcher.fetchAmountAsync(key) { amount ->
             // 兜底：丢弃过期响应（seq 不匹配说明已有更新的请求）
             if (seq != tokenWatchSeq) return@fetchAmountAsync
             tokenWatchInFlight = false
+
             if (amount == null) {
-                // 失败日志节流：断网/飞行模式下每 3 秒写一行会刷爆日志并持续耗电
+                // 失败：按"无变化"继续 5 秒；日志节流避免断网刷屏
                 val now = System.currentTimeMillis()
                 if (now - lastTokenFailLogAt >= TOKEN_FAIL_LOG_INTERVAL_MS) {
                     lastTokenFailLogAt = now
                     dumpDebug("tokenWatch: 查询失败（保持基准不变）")
                 }
-            } else {
-                val prev = lastBalanceValue
-                val prevCurrency = lastBalanceCurrency
-                val decreased = prev != null && prevCurrency == amount.currency && amount.value < prev
-                var shown = false
-                if (decreased) {
-                    // 插件事件：余额减少（与内置提示的节流相互独立）
-                    PluginEntry.onEvent(
-                        this@WhalePetService, "balanceDecreased",
-                        "{\"value\":${amount.value},\"prev\":${prev ?: 0.0}}"
-                    )
-                    // 仅"减少"触发；充值/持平不触发。10 秒内最多提示一次
-                    val now = System.currentTimeMillis()
-                    if (now - lastTokenNibbleAt >= TOKEN_NIBBLE_COOLDOWN_MS) {
-                        lastTokenNibbleAt = now
-                        shown = true
-                        showBubbleWindow(getString(R.string.token_nibble_line), clearBadge = true)
-                    }
-                }
-                // 诊断：仅在数值变化/首次/触发时记录，避免刷屏
-                if (prev == null || amount.value != prev || decreased) {
-                    // 不记录具体金额：诊断只需要"是否变化/是否触发"，
-                    // 余额属于财务数据，不应长期留在共享下载目录。
-                    dumpDebug(
-                        "tokenWatch: changed=${prev != null} cur=${amount.currency} " +
-                            "prevCur=${prevCurrency ?: "-"} " +
-                            "triggered=$decreased shown=$shown"
-                    )
-                }
-                lastBalanceValue = amount.value
-                lastBalanceCurrency = amount.currency
+                scheduleNextTokenWatch(TOKEN_WATCH_INTERVAL_MS)
+                return@fetchAmountAsync
             }
+
+            val prev = lastBalanceValue
+            val prevCurrency = lastBalanceCurrency
+            val changed = prev != null && prevCurrency == amount.currency && amount.value != prev
+            val decreased = changed && amount.value < prev
+            lastBalanceValue = amount.value
+            lastBalanceCurrency = amount.currency
+
+            if (!changed) {
+                // 无变化：继续 5 秒探测
+                scheduleNextTokenWatch(TOKEN_WATCH_INTERVAL_MS)
+                return@fetchAmountAsync
+            }
+
+            val balanceText = BalanceFetcher.formatAmount(amount)
+            if (decreased) {
+                // 先弹"偷吃"气泡，2.2 秒后再显示余额（两者互斥，串行才不会互相顶掉）
+                showBubbleWindow(getString(R.string.token_nibble_line), clearBadge = true)
+                handler.postDelayed({ showBadge(balanceText) }, TOKEN_BUBBLE_DURATION_MS)
+                // 插件事件：余额减少
+                PluginEntry.onEvent(
+                    this@WhalePetService, "balanceDecreased",
+                    "{\"value\":${amount.value},\"prev\":${prev ?: 0.0}}"
+                )
+            } else {
+                // 余额增加（充值）：不弹"偷吃"，只把新余额显示一次
+                showBadge(balanceText)
+            }
+            dumpDebug("tokenWatch: changed=true decreased=$decreased cur=${amount.currency}")
+            // 有变化后冷却 1 分钟
+            scheduleNextTokenWatch(TOKEN_COOLDOWN_AFTER_CHANGE_MS)
         }
     }
 
