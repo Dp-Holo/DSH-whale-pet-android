@@ -103,7 +103,7 @@ class ScriptSandboxTest {
         assertTrue("应包含原始信息：$err", err!!.contains("boom"))
     }
 
-    @Test(timeout = 60_000)
+    @Test(timeout = 60_000L)
     fun infiniteLoopIsAbortedAndFlagged() {
         val bridge = FakeBridge()
         val script = ScriptSandbox.compile(
@@ -116,7 +116,7 @@ class ScriptSandboxTest {
         assertTrue("死循环必须被指令上限中止", script.aborted)
     }
 
-    @Test(timeout = 120_000)
+    @Test(timeout = 120_000L)
     fun abortDoesNotPoisonLaterRuns() {
         val bridge = FakeBridge()
         val script = ScriptSandbox.compile(

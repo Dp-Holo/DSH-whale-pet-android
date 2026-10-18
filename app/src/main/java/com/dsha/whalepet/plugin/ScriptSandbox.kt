@@ -52,7 +52,9 @@ object ScriptSandbox {
     class Script internal constructor(
         internal val factory: ContextFactory,
         internal val scope: Scriptable,
-        private val state: RunState
+        // 必须 internal 而非 private：Kotlin 的嵌套类私有成员对外层 object 也不可见，
+        // 而 [compile] / [fire] 要读写它
+        internal val state: RunState
     ) {
         /** 最近一次 [compile] / [fire] 是否因超出指令上限被中止。 */
         val aborted: Boolean get() = state.aborted
