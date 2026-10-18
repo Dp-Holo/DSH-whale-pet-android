@@ -74,7 +74,7 @@
     <string name="plugin_install">安装</string>
     <string name="plugin_install_sample">安装示例插件</string>
     <string name="plugin_installed">已安装：%1$s</string>
-    <string name="plugin_install_failed">安装失败：JSON 格式不正确</string>
+    <string name="plugin_install_failed">安装失败：插件 id 不合法（只允许字母、数字与 . _ -）或 JSON 格式不正确</string>
     <string name="plugin_empty">暂无插件（可粘贴 JSON 或安装示例）</string>
     <string name="plugin_authorize">授权</string>
     <string name="plugin_authorized">已授权：%1$s</string>
@@ -86,6 +86,8 @@
     <string name="plugin_state_on">已启用</string>
     <string name="plugin_state_off">已停用</string>
     <string name="plugin_caps_none">未声明能力</string>
+    <!-- 授权对话框中"用户一个能力都没勾选"的提示（与上面的"插件未声明能力"区分） -->
+    <string name="plugin_none_selected">未选择任何能力</string>
     <string name="plugin_notif_channel">插件通知</string>
     <string name="plugin_confirm_format">插件「%1$s」请求执行敏感操作：\n%2$s</string>
 

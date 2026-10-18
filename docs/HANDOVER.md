@@ -134,7 +134,7 @@ app/src/main/aidl/…/IShizukuCommand.aidl
 
 | 项 | 说明 |
 |---|---|
-| 定时事件 `interval` | 解析已支持，触发未接入（`PluginRule.intervalMs` 尚未使用） |
+| 定时事件 | **暂不支持**。插件侧没有"每 N 分钟触发"的能力；要做需要 App 侧先新增事件源。 |
 | `network` 能力 | 让插件可联网（天气、webhook），需新增能力 + 授权 + 审计 |
 | 更多事件源 | 前台应用切换、充电开始/结束、整点 |
 | 插件导入/导出 | 目前靠"粘贴 JSON"，可加系统文件选择器（SAF）导入 |

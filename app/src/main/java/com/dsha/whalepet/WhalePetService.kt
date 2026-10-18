@@ -64,7 +64,14 @@ class WhalePetService : Service() {
         private const val TOKEN_FAIL_LOG_INTERVAL_MS = 60_000L
 
         /** 插件通知渠道与通知 id */
-        private const val PLUGIN_CHANNEL_ID = "whale_plugin_channel"
+        /**
+         * 插件通知渠道。
+         *
+         * 注意：渠道重要性**一旦创建就不能再下调**（此后由用户在系统设置里控制）。
+         * 1.1.43 起把它从"有声(DEFAULT)"降为"无声(LOW)"，所以必须换一个新 id，
+         * 并在创建后删除旧渠道，否则老用户感知不到变化。
+         */
+        private const val PLUGIN_CHANNEL_ID = "whale_plugin_channel_v2"
         private const val PLUGIN_NOTIF_ID = 2
 
     }
@@ -193,9 +200,13 @@ class WhalePetService : Service() {
                             NotificationChannel(
                                 PLUGIN_CHANNEL_ID,
                                 getString(R.string.plugin_notif_channel),
-                                NotificationManager.IMPORTANCE_DEFAULT
+                                // 无声、不弹横幅：插件通知不该打扰用户
+                                // （规则型动作另有 1 秒硬下限兜底，见 RuleThrottle）
+                                NotificationManager.IMPORTANCE_LOW
                             )
                         )
+                        // 旧渠道已停用，删掉避免系统设置里出现两个同名"插件通知"
+                        runCatching { nm.deleteNotificationChannel("whale_plugin_channel") }
                     }
                     val n = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         Notification.Builder(this@WhalePetService, PLUGIN_CHANNEL_ID)

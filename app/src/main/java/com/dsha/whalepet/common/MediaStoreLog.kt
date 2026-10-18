@@ -75,6 +75,7 @@ object MediaStoreLog {
     }
 
     /** 当前字节数；文件不存在或读取失败按 0 处理。 */
+    @Synchronized
     fun size(ctx: Context, fileName: String): Long {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return 0L
         return try {

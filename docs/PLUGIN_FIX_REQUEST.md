@@ -169,3 +169,32 @@ P2  4/5/6/7
 ```
 
 每条修完请：升版本号 → 跑 `./gradlew test` → CI 绿 → 交付**可直接安装的 .apk 文件**（注意上次 1.1.39 交付成了解压目录，用户装不上；交付物必须是 zip 格式的 .apk）。
+
+---
+
+## 后续事项（App 侧已答复，2026-10-18）
+
+### A. 空选择文案：App 侧已提供新字符串，请替换引用
+
+- 新增 `plugin_none_selected` =「未选择任何能力」（App 侧 1.1.43）
+- `plugin_caps_none`（「未声明能力」）保留原语义，**只用于"插件本身没有声明能力"**
+- 请在 `PluginUi.authorizePlugin()` 的"空选择"分支改用 `R.string.plugin_none_selected`
+  （这是一行改动；App 侧不代改插件目录）
+- 另：`plugin_install_failed` 已改为同时覆盖「id 不合法」与「JSON 格式错误」两种原因
+
+### B. `shizuku` 跨边界返回结构化：同意，但排到下一轮
+
+App 侧同意把 `PluginAppBridge.shizuku(args): String` 改为结构化返回
+（`(success: Boolean, message: String)` 或等价类型），以消除"按文案前缀归类"的脆弱点。
+
+**本轮不改**的原因与安排：
+- 当前退化后果只是"审计不够精确"，**不会误放行**（白名单仍在 App 侧拦截），风险可接受
+- 改跨边界签名需要两边同时改，避免与插件侧正在进行的改动冲突
+- 由 **App 侧下一轮发起**：先定义类型并保持向后兼容的适配，再通知插件侧适配宿主
+
+### C. `common/MediaStoreLog.size()` 已加 `@Synchronized`（App 侧 1.1.43）
+
+### D. 真机探针仍未跑
+
+需要用户在设备上手动安装插件并操作；App 侧与插件侧的代理都无法代劳（`pm install` 被策略禁止）。
+建议下一轮请用户跑一次并把 `Download/whale-plugins.log.txt` 贴回。
