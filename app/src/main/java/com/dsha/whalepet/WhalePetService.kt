@@ -93,6 +93,8 @@ class WhalePetService : Service() {
     private var lastFrameNanos = 0L
     /** 诊断 tick 的毫秒累计（改用时间而非帧数，避免高刷屏上日志变频繁） */
     private var debugTickMs = 0f
+    /** 布局更新失败日志的节流时间戳（失败可能每帧发生，避免刷屏） */
+    private var layoutFailLoggedAt = 0L
     private var balanceRunnable: Runnable? = null
     // 余额消耗检测（每 3 秒静默查询，结果不显示）
     private var tokenWatchRunnable: Runnable? = null
@@ -698,12 +700,23 @@ class WhalePetService : Service() {
      * 而它由游动循环每帧调用 → 未捕获会直接把服务崩掉（权限撤销 = 必崩）。
      * 这里兜底：失败即停止游动并结束服务，等用户重新授权后再启动。
      */
+    /**
+     * 安全地更新鲸鱼主窗口的布局。
+     *
+     * 权限被撤销或窗口被移除时 updateViewLayout 会抛异常，而它由游动循环每帧调用；
+     * 这里兜底：失败即停止游动（避免每帧抛异常），但**不结束服务**——
+     * 窗口可能只是暂时不可用，应由用户手动停止/重启，而不是被代码杀掉。
+     */
     private fun safeUpdateLayout() {
         try {
-            safeUpdateLayout()
-        } catch (_: Throwable) {
+            wm.updateViewLayout(rootView, overlayParams)
+        } catch (t: Throwable) {
             stopWander()
-            stopSelf()
+            val now = System.currentTimeMillis()
+            if (now - layoutFailLoggedAt >= 60_000L) {
+                layoutFailLoggedAt = now
+                dumpDebug("updateLayout failed: ${t.javaClass.simpleName}")
+            }
         }
     }
 
@@ -801,6 +814,14 @@ class WhalePetService : Service() {
      * 校准：窗口先摆在中间位置，用 getLocationOnScreen 与 param 的差值求出
      * 坐标系偏移，再据此换算可移动范围（校准期间窗口透明，避免闪烁）。
      */
+    /**
+     * 校准：窗口先摆到探针位置，用 getLocationOnScreen 与 param 的差值求出
+     * 坐标系偏移，再据此换算可移动范围（校准期间窗口透明，避免闪烁）。
+     *
+     * 注意：窗口刚 addView 时 updateViewLayout 可能失败（尚未 attach）。
+     * 这里先立即尝试，失败则下一帧重试一次，仍失败**降级**为按屏幕尺寸估算——
+     * **绝不能因此结束服务**（1.1.44 曾把失败路径写成 stopSelf，导致桌宠启动即退出）。
+     */
     private fun calibrateBounds() {
         appendDebugLine(
             "=== whale debug start v${packageManager.getPackageInfo(packageName, 0).versionName} ===\n"
@@ -808,15 +829,37 @@ class WhalePetService : Service() {
         overlayParams.alpha = 0f
         val probeX = 200
         val probeY = 600
-        overlayParams.x = probeX
-        overlayParams.y = probeY
-        try {
-            safeUpdateLayout()
-        } catch (_: Exception) {
-            computeSafeBounds()
-            boundsReady = true
-            return
+        if (moveToProbe(probeX, probeY)) {
+            measureWithProbe(probeX, probeY)
+        } else {
+            // 窗口可能尚未 attach：下一帧再试一次
+            rootView.post {
+                if (moveToProbe(probeX, probeY, logFailure = true)) {
+                    measureWithProbe(probeX, probeY)
+                } else {
+                    computeSafeBounds()
+                    boundsReady = true
+                    dumpDebug("calibrate: fallback to computed bounds")
+                }
+            }
         }
+    }
+
+    /** 把窗口移到探针位置；成功返回 true。 */
+    private fun moveToProbe(x0: Int, y0: Int, logFailure: Boolean = false): Boolean {
+        return try {
+            overlayParams.x = x0
+            overlayParams.y = y0
+            wm.updateViewLayout(rootView, overlayParams)
+            true
+        } catch (t: Throwable) {
+            if (logFailure) dumpDebug("calibrate: move failed ${t.javaClass.simpleName}")
+            false
+        }
+    }
+
+    /** 读取实测偏移并换算边界，然后恢复正常透明度。 */
+    private fun measureWithProbe(probeX: Int, probeY: Int) {
         rootView.postOnAnimation {
             val loc = IntArray(2)
             rootView.getLocationOnScreen(loc)
@@ -837,22 +880,11 @@ class WhalePetService : Service() {
             overlayParams.x = x.roundToInt()
             overlayParams.y = y.roundToInt()
             overlayParams.alpha = 1f
-            try {
-                safeUpdateLayout()
-            } catch (_: Exception) {
-            }
+            runCatching { wm.updateViewLayout(rootView, overlayParams) }
             dumpDebug("calibrated")
         }
     }
 
-    /**
-     * 边界处理：越界时吸附到边界，并按镜面反射调整方向角。
-     *
-     * 出射角限制为距切线至少 30°（即反射角落在 ±60° 带内）：
-     * 入射角很平时（接近水平游动触底）如果只做等角反射，出射角也很平，
-     * 鲸鱼会贴着底边横向滑行、看起来逐渐静止，直到随机扰动累积够大才猛地弹起。
-     * 限制出射角后每次触边都会以自然但不拖沓的角度明确弹开。
-     */
     private fun clamp() {
         if (!boundsReady) return                     // 自校准完成前不做边界限制
         val edge = (2 * resources.displayMetrics.density).toInt()

@@ -58,6 +58,7 @@ Android 悬浮窗桌宠「鲸鱼娘桌宠」：Kotlin + 单 Activity + 前台服
 
 | 位置 | 现象 | 原因与现状 |
 |---|---|---|
+| `WhalePetService.calibrateBounds` / `safeUpdateLayout` | 桌宠一启动就退出（1.1.44~1.1.45） | 窗口刚 addView、尚未完全附着时，第一次 `updateViewLayout` 会失败。1.1.44 把"失败"处理成 `stopSelf()`，于是启动即退出。**校准失败必须降级（重试一帧 → 按屏幕尺寸估算），不能结束服务**；游动中的布局更新失败也只停止游动。已于 1.1.46 修复 |
 | `WhalePetService` 悬浮窗边界 | 鲸鱼在底部"完全静止"数秒 | 窗口坐标原点不在物理屏幕左上，而在**状态栏下方**（该机偏移 162px）。已用「WindowMetrics 安全区 + `getLocationOnScreen` 实测偏移」校准，勿改回纯 `displayMetrics` |
 | 同上 | 触底后贴着底边平移 | 近边界软排斥 `softRepel` + 松手 `kickOffBoundary` 解决；`FLAG_LAYOUT_NO_LIMITS` 已移除，勿加回 |
 | 同上 | 点击缩放被窗口裁剪 | 窗口比本体大 25%（`windowPx = sizePx * 1.25`），本体靠 padding 居中 |
