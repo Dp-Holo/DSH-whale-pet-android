@@ -1,200 +1,128 @@
-# 插件侧待修问题清单（来自第三方批判性审查）
+# 插件侧待改清单（当前有效）
 
-> 本文件由 **App 侧维护方**整理，供**插件宿主 + 插件内容维护方**处理。
-> 审查报告已由 App 侧逐条核对源码，以下条目**全部确认属实**（不是猜测）。
-> App 侧已修的问题（余额乱序、openUrl 协议、崩溃循环、日志写入、死锁、Locale、注释）不在本清单内。
-
----
-
-## 约束（照旧）
-
-- 只改 `app/src/main/java/com/dsha/whalepet/plugin/**`、`plugins/**`、`docs/PLUGIN_SPEC.md`、`docs/probes/**`
-- **不要**改 App 本体（`app/src/main/java/com/dsha/whalepet/*.kt`、`res/`、`.github/`）
-- **不要**改 `common/`（共享基础设施，改动需双方确认）
-- 改安全边界必须带单元测试（AGENTS.md 硬规则 7），CI 会先跑 `./gradlew test`
-- 每次改动升 `versionName`；纯文档改动除外
+> 整理方：**App 侧维护方** · 更新：2026-10-18 · 对应 App 版本 `1.1.47`
+>
+> 说明：1.1.42 那批修复（TOCTOU、审计失真、intervalMs、主线程 ANR、hash/节流/缓存）**已验收通过**，
+> 不再列在本清单里。下面是**目前仍待处理**的事项，按优先级排列。
+> 每条都已核对源码位置，可直接照做。
 
 ---
 
-## P0 — 授权旁路（安全）
+## 约束（与 AGENTS.md 一致）
 
-### 1. 敏感确认的 TOCTOU：撤销授权后仍会执行
-
-**位置**：`plugin/PluginManager.kt` 的 `handleCall()`，确认回调分支（约 331-338 行）
-
-**现状**：
-```kotlin
-host.pluginConfirm(plugin.name, desc) { allowed, remember ->
-    if (!allowed) {
-        audit(..., "denied", "用户拒绝")
-    } else {
-        if (remember) setAlwaysAllowed(...)
-        perform(...)          // ← 直接执行，不复查授权
-    }
-}
-```
-
-**问题**：确认条最长挂起 15 秒。期间用户可以在插件管理页**撤销授权**或**删除插件**，然后回头点「允许」——`perform()` 照样执行。这与 1.1.39 刚修的「覆盖安装继承旧授权」是同一类旁路，且更直接。
-
-**修法**：`allowed == true` 分支里重新校验，任一不满足则记 `denied`（理由写"授权已变更"）并直接 return：
-1. `cap in granted(ctx, plugin.id)`（授权仍存在）
-2. 插件文件仍存在（`fileOf(ctx, plugin.id) != null`，未被删除）
-3. 该插件仍处于启用状态
-
-**验证**：真机操作——插件调用敏感能力 → 弹出确认条 → 切到管理页撤销授权 → 回到确认条点「允许」→ 应**不执行**，且审计写 `denied`。
+- 只改：`app/src/main/java/com/dsha/whalepet/plugin/**`、`plugins/**`、`docs/PLUGIN_SPEC.md`、`docs/probes/**`
+- **不要改** App 本体（`com/dsha/whalepet/*.kt`、`res/`、`.github/`）与 `common/**`（共享基础设施）
+- **版本号规则（重要）**：插件侧迭代**不递增数字**，用 `<App 当前版本>-Extension`
+  （当前应为 `1.1.47-Extension`）——否则同一数字下会出现两个内容不同的包，用户无法区分
+- 改安全边界必须带单测（AGENTS.md 硬规则 7）；CI 先跑 `./gradlew test`，不通过不出包
+- 交付物必须是**可直接安装的 `.apk` 文件**（zip 格式），不要交解压目录
 
 ---
 
-## P1 — 审计失真（追责依据不成立）
+## P0 · 授权语义
 
-### 2a. 确认条被顶掉，却记成"用户拒绝"
+### 1. 授权对话框"取消勾选"不生效（用户以为收回了权限，实际没有）
 
-**位置**：`plugin/PluginConfirmOverlay.kt` 的 `show()`（约 40 行，`dismiss()` 旧确认）
+**位置**：
+- `plugin/PluginUi.kt` 的 `authorizePlugin()`（约 103-114 行：把已授权能力**预先勾选**）
+- `plugin/PluginManager.kt` 的 `grant()`（约 194-197 行：只 `addAll`，**从不 remove**）
 
-**现状**：新的确认到来时，旧的按 `denied` 回调，`PluginManager` 审计写 `denied | 用户拒绝`。**用户根本没看到那条确认**，记录与事实不符。
+**问题**：用户取消勾选某项再点保存 → `grant()` 只把新勾选项加进去，被取消的**依然保持授权**。
+唯一有效的撤销入口是"撤销全部"。这是授权 UI 与安全语义的直接背离，比 TOCTOU 更容易被普通用户踩中。
 
-**修法**：把"结束原因"区分开（如 `USER_DENIED` / `TIMEOUT` / `SUPERSEDED` / `SERVICE_STOPPED`），审计按真实原因写入。回调签名可改为 `(allowed, remember, reason)`。
+**修法**：`grant()` 改为**全量替换**（先清空该插件的授权集合，再写入本次勾选项），
+或新增 `revoke(pluginId, caps)` 由 UI 在保存时调用。注意保留 `caps.isEmpty()` 时"不写入"的现有兜底。
 
-### 2b. shizuku 被白名单拒绝，审计仍写 `ok`
-
-**位置**：`plugin/PluginManager.kt` 的 `perform()`（约 378-382 行）
-
-**现状**：
-```kotlin
-"shizuku" -> {
-    val r = host.pluginShizuku(args)
-    audit(ctx, plugin.id, "call", desc, "ok", r)   // ← 结果写死 ok
-    r
-}
-```
-`host.pluginShizuku` 在命令不在白名单时返回「拒绝执行：命令不在白名单内」，但审计结果仍是 `ok`。
-
-**修法**：按返回值判结果。建议 `pluginShizuku` 返回结构化结果（如 `(success: Boolean, message: String)`），或至少：返回值以"拒绝执行"开头 → `denied`，以"执行异常/调用失败"开头 → `error`，其余 → `ok`。
-
-### 2c. 删除 / 启停插件不写审计
-
-**位置**：`plugin/PluginManager.kt` 的 `delete()` 与 `setEnabled()`
-
-**现状**：两个方法都没有任何 `audit()` 调用。审计链在最关键的管理操作上断掉——"谁在什么时候删了/停了插件"没有任何记录。
-
-**修法**：补记录，例如：
-- `delete` → `audit(ctx, id, "manage", "删除插件", "ok")`
-- `setEnabled` → `audit(ctx, id, "manage", if (enabled) "启用" else "停用", "ok")`
+**验证**：给插件授权 `say` + `openApp` → 重新打开授权框，取消 `openApp` → 保存 →
+双击触发插件调用 `openApp` → 应被拒（审计 `denied`），而不是弹确认条。
 
 ---
 
-## P1 — 契约与行为不一致
+## P1 · 契约与文案
 
-### 3. `intervalMs` 是死字段（#14）
+### 2. `docs/PLUGIN_SPEC.md` 三处与实现不符
 
-**位置**：`plugin/Plugin.kt`（约 80 行解析）、`PluginManager.dispatch()`（从未使用）
+| # | 问题 | 修法 |
+|---|---|---|
+| a | §1 字段表把 `script` 标为**必填**，但规则型插件（`rules`）没有 `script` | 改为"`script` 与 `rules` 二选一" |
+| b | 规则型的 `rules` / `cooldownMs` 语法**完全没写进契约** | 补一节规则型格式说明（含 1 秒硬下限的说明） |
+| c | `apiVersion = 1（对应 App 1.1.30）` 停在旧版；1.1.31~1.1.42 改了插件行为却没按 §9 流程升 | 按 §9 升 `apiVersion`，并在变更记录里列出 1.1.31 起的插件行为变化 |
 
-**现状**：解析了"定时"字段，`dispatch` 完全不读它；`docs/PLUGIN_SPEC.md` 也没记载 `cooldownMs`。接手者会以为定时事件已可用。
+### 3. 空选择文案替换（一行）
 
-**修法**：二选一
-- **删**：删除字段，`PLUGIN_SPEC` 明确写「暂不支持定时事件」；
-- **实现**：由 App 侧在 Service 里新增定时触发点（跨边界，需要先与 App 侧约定事件名与 payload），插件侧再消费。
-
-**建议**：先删/标注，实现另排期，避免文档误导。
-
----
-
-## P2 — 工程质量
-
-### 4. 脚本新鲜度用 32 位 `String.hashCode()`（#15）
-
-**位置**：`plugin/PluginEngine.kt` 的 `isLoadedFresh()`
-
-**问题**：32 位哈希碰撞时，脚本改动不会触发重新加载（概率极低，但逻辑上不严谨）。
-
-**修法**：用「内容长度 + hash」组合判断，或 SHA-256 前缀。
-
-### 5. `appStart` 延迟分发到已停止的服务（#16）
-
-**位置**：`plugin/PluginEntry.kt` 的 `onServiceStart()`（`postDelayed 1500ms`）
-
-**问题**：服务在 1.5 秒内停止时，延迟任务仍会向已销毁的 host 分发 `appStart`。
-
-**修法**：延迟任务执行前判断 `host` 是否仍为启动时的同一实例（或加"服务已停止"标志）。
-
-### 6. 规则型插件可发有声通知且无节流（#18）
-
-**位置**：`plugin/PluginManager.kt` 的 `dispatch()`（`cooldownMs` 默认 0）
-
-**问题**：已授权插件每次点击都能触发 `notify`；而 App 侧的插件通知渠道是 `IMPORTANCE_DEFAULT`（**有声**）→ 可被用来轰炸通知。
-
-**修法**：
-- 插件侧：给规则动作加最小触发间隔（如 1 秒），防连点轰炸；
-- App 侧（需协调）：把插件通知渠道降为 `IMPORTANCE_LOW`（无声）——这一条归 App 侧改，不要在插件目录里改。
-
-### 7. `lastFire` 不清理 + `dirStamp` 每次事件做磁盘 IO（#19）
-
-**位置**：`plugin/PluginManager.kt`（`lastFire` 表、`dirStamp()`）
-
-**问题**：
-- `lastFire` 冷却表永不清理，插件/规则被删除后键仍残留（缓慢增长）；
-- `dirStamp()` 在 `loadAll()` 里调用，而 `loadAll()` 在**每次事件**（含每一次点击）都在主线程执行 `listFiles()` 磁盘 IO。
-
-**修法**：
-- `lastFire`：定期清理或按需清理（如条目超过上限、或插件删除时移除对应键）；
-- `dirStamp`：缓存结果并设短有效期（如 3~5 秒），或对高频事件路径跳过缓存校验。
+- App 侧已新增 `plugin_none_selected` =「未选择任何能力」（1.1.43）
+- 请在 `PluginUi.authorizePlugin()` 的"空选择"分支改用 `R.string.plugin_none_selected`
+- `plugin_caps_none`（「未声明能力」）保留原语义，只用于"插件本身没有声明能力"
 
 ---
 
-## 跨边界（需与 App 侧一起做）
+## P1 · 审计完整性（探针实测发现）
 
-### 8. `shizuku` 在主线程同步执行 → 可能 ANR（#3）
+### 4. 死循环被中止时没有审计记录
 
-**位置**：`plugin/PluginManager.kt` 的 `perform()`（规则型）与确认回调（`PluginConfirmOverlay` → `cb.invoke`）
+**位置**：`plugin/PluginEngine.kt` 的 `fireInternal()`（事件执行处）
 
-**问题**：App 侧的 `ShizukuHelper.execWhitelistedSync()` 注释写明"**须在后台线程调用**"（内部最长等 5 秒）。但两条路径都在**主线程**调用它：
-1. 规则型插件的 `shizuku` 动作：`onEvent`（主线程）→ `dispatch` → `perform` → 阻塞
-2. 敏感确认回调：`PluginConfirmOverlay.finish()` 在主线程 `cb.invoke` → `perform` → 阻塞
+**实测（2026-10-18，App 1.1.47）**：探针 2（`while(true){}`）被指令上限中止了——证据是
+日志里只有「开始」、**没有「结束」**，且随后其它插件仍能正常执行（线程未卡死）。
+但审计日志里**没有**一条"事件处理失败/超时中止"的记录。
 
-**后果**：Shizuku 绑定慢时主线程阻塞最长 5 秒 → 系统判定无响应（ANR），可能弹窗或被杀。脚本型插件不受影响（脚本在后台线程执行）。
+**问题**：安全性没问题，但审计不完整——事后无法从日志判断"这次双击为什么没反应"。
 
-**修法（需配合 App 侧）**：
-- 插件侧：把 `perform()` 中所有 `host.*` 调用统一切到后台线程（单线程执行器即可），确认回调里也 post 到该线程；
-- App 侧：`PluginAppBridge` 的能力实现已按"可在后台线程调用"设计（内部 `handler.post` 切主线程），无需改动。
+**修法**：`fireInternal` 捕获到中止（`java.lang.Error` 或超时）时，写一条审计，例如：
+`audit(ctx, pluginId, event, "事件处理", "error", "执行被中止：超出指令上限")`
+
+**验证**：重跑探针 2，审计应出现一条 `error` 且不再只有"开始"。
+
+---
+
+## P2 · 工程质量
+
+### 5. 沙箱与指令上限缺自动化测试（AGENTS 硬规则 7 的缺口）
+
+**现状**：`ClassShutter`（脚本只能访问 `__bridge` 一个 Java 类）与指令上限（500 万条）
+目前只有 `docs/probes/` 的人工探针 + 源码分析，**CI 里没有任何自动化回归**。
+哪天重构 `PluginEngine`，CI 全绿也可能沙箱洞开。
+
+**修法**：把沙箱的"建作用域 + ClassShutter + 执行脚本"抽成不依赖 Android `Context` 的部分，
+用 Rhino（纯 Java 依赖）在 JVM 单测里跑：
+- 断言 `typeof Packages === 'undefined'`、`typeof java === 'undefined'`
+- 断言 `__bridge.getClass()` 抛异常（被 ClassShutter 拦）
+- 断言死循环在 N 条指令内被中止（抛 Error）
+
+> 参考 App 侧做法：`ShizukuCommandWhitelist` 就是为了可测而从 Service 里抽出来的纯逻辑。
+
+### 6. `shizuku` 迁移到结构化返回（可选，App 侧已就绪）
+
+App 侧 1.1.47 已在 `common/ShizukuOutcome` 提供结构化类型，并在 `PluginAppBridge` 加了
+默认方法 `shizukuStructured(args)`（内部按文案归类，归类规则由 App 侧维护）。
+
+- 现状：`PluginHostImpl` 仍自己按文案前缀归类（脆弱点）
+- 建议：`PluginHostImpl.pluginShizuku()` 改用 `bridge.shizukuStructured(args)`，
+  把 `Outcome.OK/DENIED/ERROR` 映射到已有的 `ShizukuResult`
+- 迁移是**可选的**，不做也不影响功能（最坏只是审计不精确，不会误放行）
+
+---
+
+## 已验收（无需再处理）
+
+| 项 | 版本 |
+|---|---|
+| 敏感确认 TOCTOU（撤销授权后仍执行） | 1.1.42 ✅ |
+| 审计失真三处（顶替/超时/服务停止、白名单拒绝记 ok、删停用不记录） | 1.1.42 ✅ |
+| `intervalMs` 死字段移除 + 契约标注 | 1.1.42 ✅ |
+| 主线程执行 shizuku（ANR） | 1.1.42 ✅ |
+| 脚本指纹哈希、appStart 延迟、规则节流、冷却表与目录缓存 | 1.1.42 ✅ |
+| 真机探针：沙箱逃逸 / 死循环 / 未授权拦截 | 1.1.47 实测 ✅（见 `docs/probes/README.md`） |
 
 ---
 
 ## 修复顺序建议
 
 ```
-P0  2. TOCTOU
-P1  2a/2b/2c 审计三项 + 3. intervalMs 标注
-P1  8. shizuku 主线程（与 App 侧协同）
-P2  4/5/6/7
+P0  1. 授权取消勾选
+P1  2. PLUGIN_SPEC 三处 + 3. 空选择文案
+P1  4. 中止审计
+P2  5. 沙箱自动测试 → 6. shizuku 结构化迁移
 ```
 
-每条修完请：升版本号 → 跑 `./gradlew test` → CI 绿 → 交付**可直接安装的 .apk 文件**（注意上次 1.1.39 交付成了解压目录，用户装不上；交付物必须是 zip 格式的 .apk）。
-
----
-
-## 后续事项（App 侧已答复，2026-10-18）
-
-### A. 空选择文案：App 侧已提供新字符串，请替换引用
-
-- 新增 `plugin_none_selected` =「未选择任何能力」（App 侧 1.1.43）
-- `plugin_caps_none`（「未声明能力」）保留原语义，**只用于"插件本身没有声明能力"**
-- 请在 `PluginUi.authorizePlugin()` 的"空选择"分支改用 `R.string.plugin_none_selected`
-  （这是一行改动；App 侧不代改插件目录）
-- 另：`plugin_install_failed` 已改为同时覆盖「id 不合法」与「JSON 格式错误」两种原因
-
-### B. `shizuku` 跨边界返回结构化：同意，但排到下一轮
-
-App 侧同意把 `PluginAppBridge.shizuku(args): String` 改为结构化返回
-（`(success: Boolean, message: String)` 或等价类型），以消除"按文案前缀归类"的脆弱点。
-
-**本轮不改**的原因与安排：
-- 当前退化后果只是"审计不够精确"，**不会误放行**（白名单仍在 App 侧拦截），风险可接受
-- 改跨边界签名需要两边同时改，避免与插件侧正在进行的改动冲突
-- 由 **App 侧下一轮发起**：先定义类型并保持向后兼容的适配，再通知插件侧适配宿主
-
-### C. `common/MediaStoreLog.size()` 已加 `@Synchronized`（App 侧 1.1.43）
-
-### D. 真机探针仍未跑
-
-需要用户在设备上手动安装插件并操作；App 侧与插件侧的代理都无法代劳（`pm install` 被策略禁止）。
-建议下一轮请用户跑一次并把 `Download/whale-plugins.log.txt` 贴回。
+每条修完：升版本号（`1.1.47-Extension` 这类）→ 跑 `./gradlew test` → CI 绿 → 交付可安装的 `.apk`。
