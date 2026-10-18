@@ -534,7 +534,13 @@ class WhalePetService : Service() {
                 overlayParams.x = x.roundToInt()
                 overlayParams.y = y.roundToInt()
                 safeUpdateLayout()
-                if (bubbleVisible) positionBubbleWindow()
+                // 只有气泡或余额实际可见时才需要更新气泡窗布局；
+                // 窗口常驻（复用）但内容隐藏时，每帧多做一次 binder 调用是浪费
+                if (bubbleVisible && (bubbleTv.visibility == View.VISIBLE ||
+                        badgeBox.visibility == View.VISIBLE)
+                ) {
+                    positionBubbleWindow()
+                }
                 true
             }
             MotionEvent.ACTION_UP -> {

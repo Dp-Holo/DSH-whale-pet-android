@@ -13,7 +13,7 @@
 - **技术栈**：Kotlin 2.0.20 · AGP 8.5.2 · minSdk 26 / targetSdk 35 · Material 3
 - **脚本引擎**：Rhino（`com.faendir.rhino:rhino-android:1.6.0`，纯 Java）
 - **构建**：GitHub Actions（`.github/workflows/build.yml`）→ debug + 签名 release APK
-- **起点**：由 DSHA（DeepSeek Harness Android）驱动 deepseek-v4-flash 编写构建
+- **起点**：由 DSHA（DeepSeek Harness Android）驱动 AI 模型编写构建（最初为 deepseek-v4-flash；模型随迭代更新，不绑定具体代际）
 
 ### 功能范围
 

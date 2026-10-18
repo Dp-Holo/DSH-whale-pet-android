@@ -38,6 +38,9 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         /** 通知权限请求码（Android 13+ 运行时权限） */
         const val REQ_NOTIF = 1002
+
+        /** 自动授权重试的最小间隔：避免每次回界面都执行系统命令 */
+        const val AUTO_GRANT_RETRY_INTERVAL_MS = 5 * 60_000L
     }
 
     private lateinit var btnToggle: Button
@@ -50,6 +53,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tabHome: TextView
     private lateinit var tabLines: TextView
     private lateinit var tabSettings: TextView
+    /** 自动授权尝试的节流时间戳（返回界面时最多每 5 分钟试一次） */
+    private var lastAutoGrantAttemptAt = 0L
 
     /** 台词管理：当前编辑中的台词池（与本地存储同步）。 */
     private lateinit var llLines: LinearLayout
@@ -315,8 +320,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // 从 Shizuku 授权 / 系统设置页返回后重试一次
-        if (ShizukuHelper.isAvailable() && !Settings.canDrawOverlays(this)) {
+        // 从 Shizuku 授权 / 系统设置页返回后重试一次；加节流，
+        // 避免每次回到界面都去执行一次系统授权命令（过于激进且无意义）
+        val now = System.currentTimeMillis()
+        if (ShizukuHelper.isAvailable() && !Settings.canDrawOverlays(this) &&
+            now - lastAutoGrantAttemptAt >= AUTO_GRANT_RETRY_INTERVAL_MS
+        ) {
+            lastAutoGrantAttemptAt = now
             ShizukuHelper.autoGrant(this) { ok, detail -> onShizukuResult(ok, detail) }
         }
         refreshOverlayState()

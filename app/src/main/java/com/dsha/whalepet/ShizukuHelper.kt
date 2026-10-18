@@ -38,7 +38,12 @@ object ShizukuHelper {
     const val REQ_SHIZUKU = 1001
 
     /** UserService 版本号：变更服务实现时递增，Shizuku 会重建旧进程。 */
-    private const val SERVICE_VERSION = 1
+    /**
+     * UserService 实现版本。**改了 UserService 侧的白名单逻辑就必须递增**：
+     * Shizuku 可能仍在跑旧版本实现，版本号不变就不会重新拉起新实现。
+     * v2：1.1.32 修正 pm grant 参数判断（白名单行为变更）。
+     */
+    private const val SERVICE_VERSION = 2
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -316,9 +321,15 @@ object ShizukuHelper {
             return null
         }
         // 后台线程等待回调（主线程不被阻塞，回调可正常派发）
-        try {
+        val connected = try {
             latch.await(5, TimeUnit.SECONDS)
         } catch (_: InterruptedException) {
+            false
+        }
+        // 超时视为失败：不返回可能陈旧/尚未就绪的缓存（迟到回调仍会填充缓存，供下次复用）
+        if (!connected) {
+            Log.w(TAG, "bindUserService timeout")
+            return null
         }
         return cachedBinder
     }

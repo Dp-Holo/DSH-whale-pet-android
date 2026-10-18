@@ -31,4 +31,14 @@ interface PluginAppBridge {
      * 实现方会**在后台线程同步执行**（调用方本身运行在插件线程）。
      */
     fun shizuku(args: List<String>): String
+
+    /**
+     * [shizuku] 的结构化版本（可选迁移）。
+     *
+     * 默认实现按 App 侧已知的返回文案归类，避免插件宿主自己解析文本；
+     * 归类规则集中在 [com.dsha.whalepet.common.ShizukuOutcome]（App 侧维护）。
+     * 现有实现无需改动即可继续工作。
+     */
+    fun shizukuStructured(args: List<String>): com.dsha.whalepet.common.ShizukuOutcome =
+        com.dsha.whalepet.common.ShizukuOutcome.classify(shizuku(args))
 }

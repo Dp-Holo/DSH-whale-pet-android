@@ -7,7 +7,7 @@
 ## 项目一句话
 
 Android 悬浮窗桌宠「鲸鱼娘桌宠」：Kotlin + 单 Activity + 前台服务（specialUse）承载系统悬浮窗；
-由 **DSHA（DeepSeek Harness Android）驱动 deepseek-v4-flash** 编写并构建。
+由 **DSHA（DeepSeek Harness Android）驱动 AI 模型**编写并构建（模型随迭代更新；最初为 deepseek-v4-flash）。
 
 ## 分工与目录归属（重要）
 
