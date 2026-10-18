@@ -39,8 +39,12 @@ Android 悬浮窗桌宠「鲸鱼娘桌宠」：Kotlin + 单 Activity + 前台服
    - 大迭代：`1.2 / 1.3 …`，**仅在用户明确指令时**发布 Release
    - Release 页**只保留最新版本**（旧版转 draft，页面不显示）
    - 版本号末位 `.0` 忽略显示（`1.1.0` 写作 `1.1`）
+   - **数字位归 App 侧**：插件侧的迭代**不递增数字**，而是用
+     `<App 侧当前版本>-Extension`（如 `1.1.46-Extension`）——
+     否则同一数字下会出现两个内容不同的包，用户无法区分
 3. **每次改动都要升版本号**（`app/build.gradle.kts` 的 `versionName`），否则用户无法区分包。
-   （**纯文档改动例外**——APK 没变就不需要升版本号，用户已明确。）
+   （**纯文档改动例外**——APK 没变就不需要升版本号，用户已明确。
+   **插件侧例外**——只加 `-Extension` 后缀、不动数字，见硬规则 2。）
 4. **不要提交密钥**：签名 keystore 只存在于 GitHub Actions Secrets（`KEYSTORE_B64` / `KEYSTORE_PASSWORD` / `KEY_PASSWORD`）与用户自己的备份。
 5. **权限改动要克制**：新增 Android 权限必须在 PR/commit 里说明用途。
 6. **用户是唯一决策者**：涉及体验（动效、文案、交互）的改动，先问再改；不擅自扩大范围。
@@ -79,13 +83,17 @@ Android 悬浮窗桌宠「鲸鱼娘桌宠」：Kotlin + 单 Activity + 前台服
 每次完成一个迭代：
 
 ```bash
-# 1) 升版本号后提交
+# 0) 先 git fetch 并基于最新 main 构建：versionCode = run number，
+#    在旧 main 上构建会得到更小的 versionCode，用户那边会按"降级"拒绝安装
+# 1) 版本号：App 侧递增数字；插件侧设为 "<当前数字>-Extension"（不递增，见硬规则 2）
+#    改完提交
 git commit -m "..." && git push
 # 2) 等 CI success（GitHub Actions）→ 下载 release artifact → 解压取 app-release.apk
 # 3) 交付到手机：/app/export?path=<apk>   → 落在 Download/DSHA/，但名字会被追加 .gz
 # 4) 立刻用设备 shell 复制成 .apk 结尾（否则安装器不认，用户会"装不上"）：
 #    adb-shell cp /sdcard/Download/DSHA/<name>.apk.gz /sdcard/Download/DSHA/<name>.apk
-# 5) 告诉用户：文件名、字节数、SHA256、本版改了什么、怎么验证
+# 5) 告诉用户：文件名（含 versionName，如 v1.1.46-Extension）、字节数、SHA256、
+#    本版改了什么、怎么验证
 ```
 
 **交付通道的硬约束（勿绕）**：
