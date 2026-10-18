@@ -2,6 +2,7 @@ package com.dsha.whalepet.plugin
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -163,5 +164,38 @@ class PluginParseTest {
     fun rejectsOverlongId() {
         assertTrue(Plugin.isValidId("a".repeat(64)))
         assertFalse(Plugin.isValidId("a".repeat(65)))
+    }
+
+    // ── 脚本指纹与已移除的死字段 ────────────────────────────────
+
+    @Test
+    fun scriptKeyTracksContent() {
+        val a = Plugin.parse("""{ "id": "k1", "script": "say('a');" }""")!!
+        val same = Plugin.parse("""{ "id": "k1", "script": "say('a');" }""")!!
+        val b = Plugin.parse("""{ "id": "k1", "script": "say('b');" }""")!!
+        assertEquals("同内容必须同指纹", a.scriptKey, same.scriptKey)
+        assertNotEquals("内容变了指纹必须变，否则不会重载", a.scriptKey, b.scriptKey)
+    }
+
+    @Test
+    fun unknownIntervalMsFieldDoesNotBreakParsing() {
+        // 旧插件可能还带着 intervalMs（该字段已在 1.1.40 移除，从未被读取过）。
+        // 不认识的字段不能导致整份插件解析失败——那会让用户的老插件凭空消失。
+        val json = """
+            {
+              "id": "legacy-timer",
+              "rules": [
+                {
+                  "when": { "event": "tap", "intervalMs": 60000 },
+                  "then": [ { "action": "say", "text": "hi" } ]
+                }
+              ]
+            }
+        """.trimIndent()
+        val p = Plugin.parse(json)
+        assertNotNull(p)
+        assertEquals(1, p!!.rules.size)
+        assertEquals("tap", p.rules[0].event)
+        assertEquals(1, p.rules[0].actions.size)
     }
 }

@@ -4,6 +4,8 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 
 /**
  * 插件宿主能力接口（由本包 PluginHostImpl 实现；敏感确认走悬浮确认条）。
@@ -18,14 +20,19 @@ interface PluginHost {
     fun pluginOpenUrl(url: String): Boolean
     fun pluginOpenApp(pkg: String): Boolean
 
-    /** 执行白名单系统命令（Shizuku），返回结果描述。 */
-    fun pluginShizuku(args: List<String>): String
+    /** 执行白名单系统命令（Shizuku）；返回值需能区分"被白名单拒绝"。 */
+    fun pluginShizuku(args: List<String>): ShizukuResult
 
-    /** 敏感操作二次确认（实现方需在主线程回调结果）。 */
+    /**
+     * 敏感操作二次确认（实现方需在主线程回调结果）。
+     *
+     * 回调必须带 [ConfirmReason]：审计要记录**真实**结束原因——超时、被后来的确认顶掉、
+     * 服务停止都曾被统一写成"用户拒绝"，而用户其实根本没看到确认条。
+     */
     fun pluginConfirm(
         pluginName: String,
         actionDesc: String,
-        onResult: (allowed: Boolean, remember: Boolean) -> Unit
+        onResult: (allowed: Boolean, remember: Boolean, reason: ConfirmReason) -> Unit
     )
 }
 
@@ -45,8 +52,22 @@ object PluginManager {
     private const val KEY_GRANTS = "plugin_grants"
     private const val KEY_ALWAYS = "plugin_always"
 
-    /** 规则触发的冷却记录：pluginId#ruleIndex → 上次触发时间。 */
-    private val lastFire = mutableMapOf<String, Long>()
+    /** 插件目录指纹的缓存有效期。 */
+    private const val STAMP_TTL_MS = 3_000L
+
+    /** 规则触发的冷却记录：`pluginId#ruleIndex` → 上次触发时间。 */
+    private val lastFire = ConcurrentHashMap<String, Long>()
+
+    /**
+     * 规则型动作与敏感确认回调的执行线程。
+     *
+     * 为什么必须有这条线程：App 侧 `shizuku` 实现内部最长等 5 秒，而规则型动作
+     * （事件由主线程分发）与确认回调（按钮点击在主线程）此前都在**主线程**直接调用它，
+     * Shizuku 绑定慢时就会阻塞主线程直到 ANR。脚本型插件本就在自己的后台线程执行。
+     */
+    private val worker = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "whale-plugin-mgmt").apply { isDaemon = true }
+    }
 
     // ── 文件与加载 ────────────────────────────────────────────
 
@@ -59,20 +80,47 @@ object PluginManager {
     fun files(ctx: Context): List<File> =
         dir(ctx).listFiles { f -> f.isFile && f.name.endsWith(".json") }?.toList() ?: emptyList()
 
-    /** 插件列表缓存：事件触发时避免每次都读盘 + 解析 JSON（dispatch 在主线程调用）。 */
+    /** 插件列表缓存：事件触发时避免每次都读盘 + 解析 JSON。 */
     private var cache: List<Plugin>? = null
     private var cacheStamp: Long = -1L
 
-    /** 插件目录的"最后修改时间"（用于让缓存随文件改动失效）。 */
-    private fun dirStamp(ctx: Context): Long =
-        dir(ctx).listFiles()?.maxOfOrNull { it.lastModified() } ?: 0L
+    /** 目录指纹缓存：`listFiles()` 是磁盘 IO，不必每次事件都做。 */
+    private var stampValue: Long = -1L
+    private var stampAt: Long = 0L
+
+    /**
+     * 插件目录的"最后修改时间"（用于让缓存随文件改动失效）。
+     *
+     * 每次事件都 `listFiles()` 在主线程上是白做的 IO，这里缓存 3 秒：
+     * 外部改动最多延迟这么久被发现，而安装/启停/删除会走 [invalidateCache] 立刻生效。
+     */
+    private fun dirStamp(ctx: Context): Long {
+        val now = System.currentTimeMillis()
+        val age = now - stampAt
+        // 用 LongRange：age 是 Long，写成 IntRange 会编译不过
+        if (stampValue >= 0 && age in 0L until STAMP_TTL_MS) return stampValue
+        val v = dir(ctx).listFiles()?.maxOfOrNull { it.lastModified() } ?: 0L
+        stampValue = v
+        stampAt = now
+        return v
+    }
 
     /** 清空缓存（安装/启用/删除/文件被外部改动后调用）。 */
+    @Synchronized
     fun invalidateCache() {
         cache = null
         cacheStamp = -1L
+        stampValue = -1L
+        stampAt = 0L
     }
 
+    /**
+     * 读取全部插件。
+     *
+     * `@Synchronized`：事件分发在 [worker] 上调用，而设置页的插件列表在主线程调用，
+     * 两边都会走到这里读写缓存。
+     */
+    @Synchronized
     fun loadAll(ctx: Context): List<Plugin> {
         val stamp = dirStamp(ctx)
         cache?.let { if (stamp == cacheStamp) return it }
@@ -130,6 +178,8 @@ object PluginManager {
             f.writeText(o.toString(2))
             invalidateCache()
             PluginEngine.unload(id)            // 停用/启用都先卸载，启用时事件到来会自动重新加载
+            // 启停是管理操作，审计链不能在这里断掉
+            audit(ctx, id, "manage", if (enabled) "启用插件" else "停用插件", "ok")
             true
         } catch (_: Throwable) {
             false
@@ -141,7 +191,16 @@ object PluginManager {
         return try {
             PluginEngine.unload(id)
             invalidateCache()
-            f.delete()                       // try 的值：删除是否成功
+            val deleted = f.delete()         // try 的值：删除是否成功
+            if (deleted) {
+                // 授权记录与冷却记录也要一起清：否则同 id 重新安装会继承旧授权
+                // （install 只在"文件已存在"时 revoke，文件已被删的情况挡不住）
+                revokeAll(ctx, id)
+                lastFire.keys.removeAll { it.startsWith("$id#") }
+            }
+            // 删除是最关键的管理操作之一，必须留痕
+            audit(ctx, id, "manage", "删除插件", if (deleted) "ok" else "error")
+            deleted
         } catch (_: Throwable) {
             false
         }
@@ -245,13 +304,21 @@ object PluginManager {
     /**
      * 分发事件给所有启用插件。
      * 规则型插件按规则执行动作；脚本型插件调用其注册的 handler。
+     *
+     * 立即切到 [worker] 执行：本方法由主线程（点击 / 电量 / 息屏广播）调用，
+     * 而规则型动作里的 `shizuku` 可能阻塞数秒，直接执行有 ANR 风险。
+     * 事件按提交顺序在单线程上串行处理，语义与同步版一致。
      */
     fun dispatch(ctx: Context, host: PluginHost, event: String, payloadJson: String = "{}") {
+        worker.execute { dispatchInternal(ctx, host, event, payloadJson) }
+    }
+
+    private fun dispatchInternal(ctx: Context, host: PluginHost, event: String, payloadJson: String) {
         val now = System.currentTimeMillis()
         loadAll(ctx).filter { it.enabled }.forEach { plugin ->
             if (plugin.isScript) {
                 // 脚本内容变了（用户改了文件/覆盖安装）也要重新加载，否则改动不生效
-                if (!PluginEngine.isLoadedFresh(plugin.id, plugin.script.hashCode())) {
+                if (!PluginEngine.isLoadedFresh(plugin.id, plugin.scriptKey)) {
                     PluginEngine.load(ctx, plugin, host)
                 }
                 PluginEngine.fireEvent(ctx, plugin.id, event, payloadJson)
@@ -259,10 +326,11 @@ object PluginManager {
                 plugin.rules.forEachIndexed { idx, rule ->
                     if (rule.event != event) return@forEachIndexed
                     val key = "${plugin.id}#$idx"
-                    if (rule.cooldownMs > 0 && now - (lastFire[key] ?: 0L) < rule.cooldownMs) {
+                    if (!RuleThrottle.shouldFire(lastFire[key], now, rule.cooldownMs)) {
                         return@forEachIndexed
                     }
                     lastFire[key] = now
+                    pruneLastFire(now)
                     rule.actions.forEach { action ->
                         handleCall(
                             ctx, host, plugin,
@@ -273,6 +341,16 @@ object PluginManager {
                 }
             }
         }
+    }
+
+    /**
+     * `lastFire` 只增不减会慢慢堆积（插件/规则删掉后键还留着）。
+     * 超过上限时丢掉已经过期的条目——仍在冷却窗口内的记录必须保留，否则节流失效。
+     */
+    private fun pruneLastFire(now: Long) {
+        if (lastFire.size <= RuleThrottle.MAX_TRACKED_RULES) return
+        val cutoff = now - RuleThrottle.RETENTION_MS
+        lastFire.filterValues { it < cutoff }.keys.forEach { lastFire.remove(it) }
     }
 
     private fun actionArgs(a: PluginAction): List<String> = when (a.type) {
@@ -328,17 +406,40 @@ object PluginManager {
         }
         if (cap in PluginCaps.SENSITIVE && !isAlwaysAllowed(ctx, plugin.id, cap)) {
             // 敏感操作：二次确认后才执行
-            host.pluginConfirm(plugin.name, desc) { allowed, remember ->
+            host.pluginConfirm(plugin.name, desc) { allowed, remember, reason ->
                 if (!allowed) {
-                    audit(ctx, plugin.id, "call", desc, "denied", "用户拒绝")
+                    // 按真实原因记账：超时/被顶掉/服务停止都不等于"用户拒绝"
+                    audit(ctx, plugin.id, "call", desc, "denied", reason.auditText())
                 } else {
-                    if (remember) setAlwaysAllowed(ctx, plugin.id, cap)
-                    perform(ctx, host, plugin, action, args, desc)
+                    // 确认条最长挂起 15 秒。这段窗口里用户完全可能在管理页撤销授权、
+                    // 停用或删除插件，然后回头点「允许」——不复查就等于让后到的拒绝失效。
+                    val blockReason = revalidate(ctx, plugin, cap)
+                    if (blockReason != null) {
+                        audit(ctx, plugin.id, "call", desc, "denied", blockReason)
+                    } else {
+                        if (remember) setAlwaysAllowed(ctx, plugin.id, cap)
+                        // 切到后台执行：perform 里的 shizuku 可能阻塞数秒，
+                        // 而确认回调是在主线程（按钮点击）触发的。
+                        worker.execute { perform(ctx, host, plugin, action, args, desc) }
+                    }
                 }
             }
             return "pending: 等待用户确认"
         }
         return perform(ctx, host, plugin, action, args, desc)
+    }
+
+    /**
+     * 确认通过后、真正执行前的复查（TOCTOU）。
+     *
+     * 返回 null 表示放行；否则返回写进审计的拒绝理由。
+     */
+    private fun revalidate(ctx: Context, plugin: Plugin, cap: String): String? {
+        if (cap !in granted(ctx, plugin.id)) return "授权已变更：该能力已被撤销"
+        val current = loadAll(ctx).firstOrNull { it.id == plugin.id }
+            ?: return "授权已变更：插件已被删除"
+        if (!current.enabled) return "授权已变更：插件已被停用"
+        return null
     }
 
     private fun perform(
@@ -377,8 +478,10 @@ object PluginManager {
             }
             "shizuku" -> {
                 val r = host.pluginShizuku(args)
-                audit(ctx, plugin.id, "call", desc, "ok", r)
-                r
+                // 按真实结果记账：白名单拒绝 ≠ 成功。
+                // 此前结果写死 ok，等于把安全拦截记成了"执行成功"，日志里完全看不出来。
+                audit(ctx, plugin.id, "call", desc, r.auditResult, r.message)
+                r.message
             }
             else -> {
                 audit(ctx, plugin.id, "call", desc, "error", "未知动作")

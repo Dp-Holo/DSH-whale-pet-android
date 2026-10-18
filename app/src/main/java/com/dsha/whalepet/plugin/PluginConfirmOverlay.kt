@@ -23,7 +23,7 @@ object PluginConfirmOverlay {
 
     private val handler = Handler(Looper.getMainLooper())
     private var win: View? = null
-    private var callback: ((Boolean, Boolean) -> Unit)? = null
+    private var callback: ((Boolean, Boolean, ConfirmReason) -> Unit)? = null
     private var timeout: Runnable? = null
 
     /** 展示确认条；可在任意线程调用（内部切主线程）。 */
@@ -31,22 +31,29 @@ object PluginConfirmOverlay {
         context: Context,
         pluginName: String,
         actionDesc: String,
-        onResult: (allowed: Boolean, remember: Boolean) -> Unit
+        onResult: (allowed: Boolean, remember: Boolean, reason: ConfirmReason) -> Unit
     ) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
             handler.post { show(context, pluginName, actionDesc, onResult) }
             return
         }
-        dismiss()                                    // 同一时刻只保留一个确认条
+        // 同一时刻只保留一个确认条；旧的那条是被顶掉的，不能记成"用户拒绝"
+        dismiss(ConfirmReason.SUPERSEDED)
         callback = onResult
         try {
             val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
             val view = View.inflate(context, R.layout.overlay_plugin_confirm, null)
             view.findViewById<TextView>(R.id.confirm_text).text =
                 context.getString(R.string.plugin_confirm_format, pluginName, actionDesc)
-            view.findViewById<Button>(R.id.confirm_allow).setOnClickListener { finish(true, false) }
-            view.findViewById<Button>(R.id.confirm_always).setOnClickListener { finish(true, true) }
-            view.findViewById<Button>(R.id.confirm_deny).setOnClickListener { finish(false, false) }
+            view.findViewById<Button>(R.id.confirm_allow).setOnClickListener {
+                finish(true, false, ConfirmReason.ALLOWED)
+            }
+            view.findViewById<Button>(R.id.confirm_always).setOnClickListener {
+                finish(true, true, ConfirmReason.ALLOWED)
+            }
+            view.findViewById<Button>(R.id.confirm_deny).setOnClickListener {
+                finish(false, false, ConfirmReason.USER_DENIED)
+            }
 
             val dm = context.resources.displayMetrics
             val params = WindowManager.LayoutParams(
@@ -62,21 +69,26 @@ object PluginConfirmOverlay {
             }
             wm.addView(view, params)
             win = view
-            timeout = Runnable { finish(false, false) }
+            timeout = Runnable { finish(false, false, ConfirmReason.TIMEOUT) }
             handler.postDelayed(timeout!!, TIMEOUT_MS)
         } catch (_: Throwable) {
-            // 悬浮窗不可用（未授权等）：视为拒绝
+            // 悬浮窗不可用（未授权等）：按"无法确认"结束，不冒充用户拒绝
             callback = null
-            onResult(false, false)
+            onResult(false, false, ConfirmReason.UNAVAILABLE)
         }
     }
 
-    /** 收起确认条（若正在等待，按"拒绝"结束）。 */
-    fun dismiss() {
-        if (callback != null || win != null) finish(false, false)
+    /**
+     * 收起确认条（若正在等待，按 [reason] 结束）。
+     *
+     * 调用方必须给出**真实原因**：服务停止用 [ConfirmReason.SERVICE_STOPPED]，
+     * 被新确认顶替用 [ConfirmReason.SUPERSEDED]——不要一律当成"用户拒绝"。
+     */
+    fun dismiss(reason: ConfirmReason) {
+        if (callback != null || win != null) finish(false, false, reason)
     }
 
-    private fun finish(allowed: Boolean, remember: Boolean) {
+    private fun finish(allowed: Boolean, remember: Boolean, reason: ConfirmReason) {
         val cb = callback
         callback = null
         timeout?.let(handler::removeCallbacks)
@@ -90,6 +102,6 @@ object PluginConfirmOverlay {
             } catch (_: Throwable) {
             }
         }
-        cb?.invoke(allowed, remember)
+        cb?.invoke(allowed, remember, reason)
     }
 }

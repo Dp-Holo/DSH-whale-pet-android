@@ -74,10 +74,14 @@ data class PluginAction(
     }
 }
 
-/** 规则：某事件发生（可选冷却）时执行一组动作。 */
+/**
+ * 规则：某事件发生（可选冷却）时执行一组动作。
+ *
+ * 注意：**暂不支持定时事件**。旧版本解析过一个 `intervalMs` 字段但从未读取，
+ * 留在模型里只会让人误以为"定时可用"，已移除（见 PLUGIN_SPEC §2）。
+ */
 data class PluginRule(
     val event: String,
-    val intervalMs: Long = 0L,
     val cooldownMs: Long = 0L,
     val actions: List<PluginAction>
 )
@@ -90,7 +94,14 @@ data class Plugin(
     val capabilities: Set<String>,
     val rules: List<PluginRule>,
     /** 脚本型插件的 JS 源码；为空表示规则型（JSON 规则）。 */
-    val script: String = ""
+    val script: String = "",
+    /**
+     * 脚本内容指纹（见 [PluginContentKey]）。
+     *
+     * 用于判断"是否需要重新加载"：此前用 `script.hashCode()`（32 位），
+     * 碰撞时会漏掉重载，表现为"改了脚本不生效"。在解析时算一次并随模型缓存。
+     */
+    val scriptKey: String = PluginContentKey.of(script)
 ) {
     /** 是否脚本型插件。 */
     val isScript: Boolean
@@ -151,7 +162,6 @@ data class Plugin(
                             rules.add(
                                 PluginRule(
                                     event = event,
-                                    intervalMs = whenObj.optLong("intervalMs", 0L),
                                     cooldownMs = r.optLong("cooldownMs", 0L),
                                     actions = actions
                                 )

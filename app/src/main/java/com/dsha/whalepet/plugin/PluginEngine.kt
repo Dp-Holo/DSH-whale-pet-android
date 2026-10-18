@@ -29,13 +29,13 @@ import java.util.concurrent.Executors
  */
 object PluginEngine {
 
-    private class Loaded(val plugin: Plugin, val scope: Scriptable, val scriptHash: Int)
+    private class Loaded(val plugin: Plugin, val scope: Scriptable, val scriptKey: String)
 
     /**
-     * 已加载插件：id → 作用域 + 脚本 hash。
+     * 已加载插件：id → 作用域 + 脚本指纹。
      *
      * 用 [ConcurrentHashMap] 而不是普通 Map：写入发生在 `whale-plugin` 线程，
-     * 而 [isLoaded] / [isLoadedFresh] 由**主线程**在每次 `dispatch` 时调用，
+     * 而 [isLoaded] / [isLoadedFresh] 会在事件分发时被另一条线程调用，
      * 普通 HashMap 在并发读写下可能返回错值或抛异常。
      */
     private val loaded = ConcurrentHashMap<String, Loaded>()
@@ -130,10 +130,13 @@ object PluginEngine {
      * 已加载且脚本内容与当前一致？
      *
      * 只判断"是否加载过"会导致用户改了插件文件却不生效（必须停/开桌宠才行）。
-     * 这里比对脚本内容 hash：内容变了就返回 false，调用方会重新加载。
+     * 这里比对**内容指纹**（长度 + SHA-256 前缀，见 [PluginContentKey]）：
+     * 内容变了就返回 false，调用方会重新加载。
+     *
+     * 不用 32 位 `hashCode()`：碰撞时会漏掉重载，用户表现为"改了没生效"。
      */
-    fun isLoadedFresh(pluginId: String, scriptHash: Int): Boolean =
-        loaded.containsKey(pluginId) && loaded[pluginId]?.scriptHash == scriptHash
+    fun isLoadedFresh(pluginId: String, scriptKey: String): Boolean =
+        loaded[pluginId]?.scriptKey == scriptKey
 
     /** 异步加载（或重载）脚本插件；语法错误会写入审计。 */
     fun load(ctx: AppContext, plugin: Plugin, host: PluginHost) {
@@ -171,7 +174,7 @@ object PluginEngine {
                 cx.evaluateString(scope, GLUE_JS, "whale-glue", 1, null)
                 cx.evaluateString(scope, plugin.script, plugin.id, 1, null)
 
-                loaded[plugin.id] = Loaded(plugin, scope, plugin.script.hashCode())
+                loaded[plugin.id] = Loaded(plugin, scope, plugin.scriptKey)
                 PluginManager.audit(ctx, plugin.id, "load", "脚本已加载", "ok")
             } finally {
                 Context.exit()

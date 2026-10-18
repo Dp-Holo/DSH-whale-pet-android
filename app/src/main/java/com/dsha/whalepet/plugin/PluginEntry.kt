@@ -31,7 +31,12 @@ object PluginEntry {
         host = h
         PluginManager.preloadScripts(app, h)
         handler.postDelayed({
-            PluginManager.dispatch(app, h, "appStart", "{}")
+            // 服务可能在 1.5 秒内就被停掉（或重启成新的 host）。
+            // 只对"仍然是启动时那个 host"分发 appStart，否则会把事件投给已销毁的
+            // host —— 它的 bridge 指向已经停止的服务。
+            if (host === h) {
+                PluginManager.dispatch(app, h, "appStart", "{}")
+            }
         }, 1500L)
     }
 
@@ -39,7 +44,8 @@ object PluginEntry {
     fun onServiceStop() {
         host = null
         PluginEngine.shutdown()
-        PluginConfirmOverlay.dismiss()
+        // 确认条是被服务停止收起的，不是用户拒绝
+        PluginConfirmOverlay.dismiss(ConfirmReason.SERVICE_STOPPED)
     }
 
     /** 事件源触发（未启动时静默忽略）。 */
@@ -73,12 +79,17 @@ internal class PluginHostImpl(
 
     override fun pluginOpenApp(pkg: String): Boolean = bridge.openApp(pkg)
 
-    override fun pluginShizuku(args: List<String>): String = bridge.shizuku(args)
+    /**
+     * App 侧只返回一段人可读文本（跨边界签名不动），这里就地归类。
+     * 归类后审计才能区分"白名单拒绝"与"真的执行了"。
+     */
+    override fun pluginShizuku(args: List<String>): ShizukuResult =
+        ShizukuResult.classify(bridge.shizuku(args))
 
     override fun pluginConfirm(
         pluginName: String,
         actionDesc: String,
-        onResult: (allowed: Boolean, remember: Boolean) -> Unit
+        onResult: (allowed: Boolean, remember: Boolean, reason: ConfirmReason) -> Unit
     ) {
         PluginConfirmOverlay.show(appContext, pluginName, actionDesc, onResult)
     }
