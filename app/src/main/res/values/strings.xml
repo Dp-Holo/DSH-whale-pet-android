@@ -96,6 +96,14 @@
     <string name="plugin_notif_channel">插件通知</string>
     <string name="plugin_confirm_format">插件「%1$s」请求执行敏感操作：\n%2$s</string>
 
+    <!-- 外部脚本文件（SAF）。插件侧新增功能所需的文案，按约定统一放在这里 -->
+    <string name="plugin_script_file_bound">脚本文件：%1$s</string>
+    <string name="plugin_script_file_unbound">未选择脚本文件（声明：%1$s）</string>
+    <string name="plugin_script_pick">选择 / 重新选择脚本文件</string>
+    <string name="plugin_script_pick_ok">脚本文件已绑定</string>
+    <string name="plugin_script_pick_failed">脚本文件不可用（读取失败或超过 256KB）</string>
+    <string name="plugin_script_pick_unsupported">当前界面不支持选择文件</string>
+
     <string name="about_version_format">版本 %1$s</string>
     <string name="about_desc">由 DSHA（DeepSeek Harness Android）驱动 AI 模型编写并构建。模型随技术迭代更新，具体代际见仓库文档。</string>
     <string name="about_privacy_title">隐私</string>

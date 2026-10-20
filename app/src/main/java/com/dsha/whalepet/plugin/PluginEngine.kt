@@ -17,16 +17,24 @@ import java.util.concurrent.Executors
  */
 object PluginEngine {
 
-    private class Loaded(val script: ScriptSandbox.Script, val scriptKey: String)
+    private class Loaded(val script: ScriptSandbox.Script)
 
     /**
-     * 已加载插件：id → 沙箱脚本 + 内容指纹。
+     * 已加载插件：id → 沙箱脚本。
      *
      * 用 [ConcurrentHashMap] 而不是普通 Map：写入发生在 `whale-plugin` 线程，
      * 而 [isLoaded] / [isLoadedFresh] 会在事件分发时被另一条线程调用，
      * 普通 HashMap 在并发读写下可能返回错值或抛异常。
      */
     private val loaded = ConcurrentHashMap<String, Loaded>()
+
+    /**
+     * 已尝试加载的 token：id → 当次脚本来源的指纹（**成功与失败都记**）。
+     *
+     * 为什么要记失败：脚本文件没选/失效时加载会失败。若只按"是否加载成功"判断，
+     * 每个事件（点击、每 3 秒的余额检测）都会重试一次并写一条审计，日志被刷屏。
+     */
+    private val attempted = ConcurrentHashMap<String, String>()
 
     /** 单线程执行器：所有脚本（加载与事件）都在这条线程上串行跑。 */
     private val executor = Executors.newSingleThreadExecutor { r ->
@@ -36,16 +44,14 @@ object PluginEngine {
     fun isLoaded(pluginId: String): Boolean = loaded.containsKey(pluginId)
 
     /**
-     * 已加载且脚本内容与当前一致？
+     * 这次脚本来源是否已经尝试过（无论成败）。
      *
-     * 只判断"是否加载过"会导致用户改了插件文件却不生效（必须停/开桌宠才行）。
-     * 这里比对**内容指纹**（长度 + SHA-256 前缀，见 [PluginContentKey]）：
-     * 内容变了就返回 false，调用方会重新加载。
+     * token 由 `PluginManager.scriptToken()` 给出：内联内容指纹 + 已绑定的脚本 URI。
+     * 换文件或改 JSON 都会让 token 变化，从而触发重新加载。
      *
      * 不用 32 位 `hashCode()`：碰撞时会漏掉重载，用户表现为"改了没生效"。
      */
-    fun isLoadedFresh(pluginId: String, scriptKey: String): Boolean =
-        loaded[pluginId]?.scriptKey == scriptKey
+    fun isLoadedFresh(pluginId: String, token: String): Boolean = attempted[pluginId] == token
 
     /** 异步加载（或重载）脚本插件；语法错误会写入审计。 */
     fun load(ctx: AppContext, plugin: Plugin, host: PluginHost) {
@@ -54,7 +60,10 @@ object PluginEngine {
     }
 
     fun unload(pluginId: String) {
-        executor.execute { loaded.remove(pluginId) }
+        executor.execute {
+            loaded.remove(pluginId)
+            attempted.remove(pluginId)
+        }
     }
 
     /** 异步触发某插件的某事件。 */
@@ -64,30 +73,61 @@ object PluginEngine {
 
     /** 异步卸载全部（服务停止时调用）。 */
     fun shutdown() {
-        executor.execute { loaded.clear() }
+        executor.execute {
+            loaded.clear()
+            attempted.clear()
+        }
     }
 
     // ── 以下均在插件线程上执行 ────────────────────────────────
 
+    /**
+     * 加载脚本：先确定来源（已绑定文件 > 内联 `script`），再编译进沙箱。
+     *
+     * 文件读取放在这条线程上——它已经是后台线程，不会卡 UI。
+     * 无论成功失败都会记下 token（见 [attempted]），避免每个事件重试刷审计。
+     */
     private fun loadInternal(ctx: AppContext, plugin: Plugin, host: PluginHost) {
         loaded.remove(plugin.id)
+        val token = PluginManager.scriptToken(ctx, plugin)
         try {
-            val bridge = PluginBridge(ctx, plugin, host)
-            val script = ScriptSandbox.compile(bridge, plugin.script, plugin.id)
-            loaded[plugin.id] = Loaded(script, plugin.scriptKey)
-            if (script.aborted) {
-                // 加载阶段就死循环：同样要留痕，否则只表现为"插件没反应"
-                PluginManager.audit(
-                    ctx, plugin.id, "load", "脚本加载失败", "error", ScriptSandbox.ABORT_DETAIL
-                )
-            } else {
-                PluginManager.audit(ctx, plugin.id, "load", "脚本已加载", "ok")
+            when (val source = PluginManager.loadScriptText(ctx, plugin)) {
+                is ScriptSource.Missing ->
+                    PluginManager.audit(ctx, plugin.id, "load", "脚本未加载", "error", source.reason)
+
+                is ScriptSource.Inline ->
+                    compileAndStore(ctx, plugin, host, source.text, "内联脚本")
+
+                is ScriptSource.File ->
+                    compileAndStore(ctx, plugin, host, source.text, "脚本文件")
             }
         } catch (t: Throwable) {
             PluginManager.audit(
                 ctx, plugin.id, "load", "脚本加载失败", "error",
                 t.message ?: t.javaClass.simpleName
             )
+        } finally {
+            attempted[plugin.id] = token
+        }
+    }
+
+    private fun compileAndStore(
+        ctx: AppContext,
+        plugin: Plugin,
+        host: PluginHost,
+        scriptText: String,
+        sourceDesc: String
+    ) {
+        val bridge = PluginBridge(ctx, plugin, host)
+        val script = ScriptSandbox.compile(bridge, scriptText, "${plugin.id}($sourceDesc)")
+        loaded[plugin.id] = Loaded(script)
+        if (script.aborted) {
+            // 加载阶段就死循环：同样要留痕，否则只表现为"插件没反应"
+            PluginManager.audit(
+                ctx, plugin.id, "load", "脚本加载失败", "error", ScriptSandbox.ABORT_DETAIL
+            )
+        } else {
+            PluginManager.audit(ctx, plugin.id, "load", "脚本已加载", "ok", "来源：$sourceDesc")
         }
     }
 

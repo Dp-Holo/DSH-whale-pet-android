@@ -166,6 +166,40 @@ class PluginParseTest {
         assertFalse(Plugin.isValidId("a".repeat(65)))
     }
 
+    // ── 外部脚本文件（scriptFile 只是元数据）──────────────────────
+
+    @Test
+    fun parsesScriptFileMetadata() {
+        val p = Plugin.parse("""{ "id": "ext-a", "scriptFile": "my-plugin.js" }""")
+        assertNotNull(p)
+        assertEquals("my-plugin.js", p!!.scriptFile)
+        // 声明了 scriptFile 但还没绑定文件，也要按脚本型处理，
+        // 否则会被当成"没有 rules 的规则型插件"静默消失
+        assertTrue(p.isScript)
+    }
+
+    @Test
+    fun scriptFileIsReducedToBareFileName() {
+        // 这个字段是展示用的，就算写成完整路径也不能被当路径用
+        val p = Plugin.parse("""{ "id": "ext-b", "scriptFile": "/sdcard/Download/my-plugin.js" }""")
+        assertEquals("my-plugin.js", p!!.scriptFile)
+    }
+
+    @Test
+    fun blankScriptFileIsTreatedAsAbsent() {
+        val p = Plugin.parse("""{ "id": "ext-c", "scriptFile": "   " }""")
+        assertNotNull(p)
+        assertNull(p!!.scriptFile)
+        assertFalse("既无 script 也无 scriptFile，就不是脚本型", p.isScript)
+    }
+
+    @Test
+    fun pluginWithOnlyInlineScriptHasNoScriptFile() {
+        val p = Plugin.parse("""{ "id": "ext-d", "script": "say('x');" }""")
+        assertNull(p!!.scriptFile)
+        assertTrue(p.isScript)
+    }
+
     // ── 脚本指纹与已移除的死字段 ────────────────────────────────
 
     @Test

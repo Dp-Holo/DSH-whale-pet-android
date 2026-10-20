@@ -1,6 +1,9 @@
 package com.dsha.whalepet.plugin
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.OpenableColumns
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -51,6 +54,12 @@ object PluginManager {
     private const val PREFS = "whale_pet_prefs"
     private const val KEY_GRANTS = "plugin_grants"
     private const val KEY_ALWAYS = "plugin_always"
+
+    /** 外部脚本文件：pluginId → SAF 的 content URI 字符串。 */
+    private const val KEY_SCRIPT_URI = "plugin_script_uri"
+
+    /** 外部脚本文件：pluginId → 展示用文件名（文件失效时也能告诉用户当初选的是哪个）。 */
+    private const val KEY_SCRIPT_NAME = "plugin_script_name"
 
     /** 插件目录指纹的缓存有效期。 */
     private const val STAMP_TTL_MS = 3_000L
@@ -213,6 +222,115 @@ object PluginManager {
         }
     }
 
+    // ── 外部脚本文件（SAF）────────────────────────────────────
+
+    fun scriptUriOf(ctx: Context, pluginId: String): String? = readStrMap(ctx, KEY_SCRIPT_URI)[pluginId]
+
+    /** 展示用文件名；未绑定返回 null。 */
+    fun scriptFileNameOf(ctx: Context, pluginId: String): String? = readStrMap(ctx, KEY_SCRIPT_NAME)[pluginId]
+
+    /**
+     * 绑定用户通过系统文件选择器选中的脚本文件。
+     *
+     * 两件事必须做对：
+     *  1. `takePersistableUriPermission` —— 不调用它，**重启后就再也读不到这个文件**；
+     *  2. 绑定前**试读一次** —— 读不出来就当绑定失败，别让用户以为绑好了。
+     *
+     * 绑定成功后强制卸载该插件，下一次事件分发会按新来源重新加载。
+     */
+    fun bindScriptUri(ctx: Context, pluginId: String, uri: Uri): Boolean {
+        val persisted = try {
+            ctx.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            true
+        } catch (_: Throwable) {
+            // 个别 provider 不支持持久授权：本次仍可用，但重启后需要重新选择
+            false
+        }
+
+        val (text, error) = readScriptUri(ctx, uri.toString())
+        if (text == null) {
+            audit(ctx, pluginId, "manage", "绑定脚本文件", "error", error ?: "读取失败")
+            return false
+        }
+
+        val name = displayNameOf(ctx, uri) ?: uri.lastPathSegment ?: "（未知文件）"
+        readStrMap(ctx, KEY_SCRIPT_URI).apply { put(pluginId, uri.toString()) }
+            .let { writeStrMap(ctx, KEY_SCRIPT_URI, it) }
+        readStrMap(ctx, KEY_SCRIPT_NAME).apply { put(pluginId, name) }
+            .let { writeStrMap(ctx, KEY_SCRIPT_NAME, it) }
+        invalidateCache()
+        PluginEngine.unload(pluginId)              // 脚本来源变了，必须重新加载
+        audit(
+            ctx, pluginId, "manage", "绑定脚本文件：$name", "ok",
+            if (persisted) "已持久授权（重启后仍可读）" else "持久授权失败：重启后可能需要重新选择"
+        )
+        return true
+    }
+
+    /**
+     * 脚本新鲜度 token：内联内容指纹 + 已绑定的 URI。
+     *
+     * 换文件（URI 变化）或改插件 JSON 都会让它变化，从而触发重新加载。
+     * 注意：**直接改 `.js` 文件内容不会改 URI**，需要重新选择一次或重启桌宠才会生效。
+     */
+    fun scriptToken(ctx: Context, plugin: Plugin): String =
+        plugin.scriptKey + "|" + (scriptUriOf(ctx, plugin.id) ?: "-")
+
+    /**
+     * 决定本次用哪一份脚本：已绑定的文件 > 内联 `script`。
+     *
+     * 文件读取失败会写审计；若插件还写了内联脚本，则优雅回退到内联，
+     * 而不是让整个插件静默失效。
+     */
+    fun loadScriptText(ctx: Context, plugin: Plugin): ScriptSource {
+        val uri = scriptUriOf(ctx, plugin.id)
+        var fileText: String? = null
+        if (uri != null) {
+            val (text, error) = readScriptUri(ctx, uri)
+            if (text == null) {
+                audit(ctx, plugin.id, "load", "脚本文件不可用", "error", error ?: "未知原因")
+            } else {
+                fileText = text
+            }
+        }
+        return ScriptResolver.sourceOf(uri, fileText, plugin.script)
+    }
+
+    /**
+     * 按 UTF-8 读取脚本文件，最多读 `上限+1` 字节（多读 1 字节用于判断是否超限，
+     * 避免把整个超大文件读进内存）。
+     *
+     * @return (文本, 失败原因)，二者恰有一个非空
+     */
+    private fun readScriptUri(ctx: Context, uriString: String): Pair<String?, String?> = try {
+        ctx.contentResolver.openInputStream(Uri.parse(uriString))?.use { input ->
+            val limit = ScriptResolver.MAX_SCRIPT_BYTES
+            val buf = ByteArray(limit + 1)
+            var total = 0
+            while (total < buf.size) {
+                val n = input.read(buf, total, buf.size - total)
+                if (n <= 0) break
+                total += n
+            }
+            if (ScriptResolver.isOversize(total)) {
+                null to "脚本文件超过 ${ScriptResolver.sizeLimitText()} 上限"
+            } else {
+                String(buf, 0, total, Charsets.UTF_8) to null
+            }
+        } ?: (null to "无法打开脚本文件（URI 失效或无权限）")
+    } catch (t: Throwable) {
+        null to (t.message ?: t.javaClass.simpleName)
+    }
+
+    /** SAF 文档的文件名（用于界面展示与审计）。 */
+    private fun displayNameOf(ctx: Context, uri: Uri): String? = try {
+        ctx.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0) else null
+        }
+    } catch (_: Throwable) {
+        null
+    }
+
     // ── 能力授权 ──────────────────────────────────────────────
 
     private fun readMap(ctx: Context, key: String): MutableMap<String, MutableSet<String>> {
@@ -239,6 +357,26 @@ object PluginManager {
             v.forEach { arr.put(it) }
             o.put(k, arr)
         }
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(key, o.toString()).apply()
+    }
+
+    /** id → 字符串 的轻量映射（脚本 URI 与文件名用；授权用的是上面那套 Set 映射）。 */
+    private fun readStrMap(ctx: Context, key: String): MutableMap<String, String> {
+        val raw = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(key, null)
+            ?: return mutableMapOf()
+        val out = mutableMapOf<String, String>()
+        try {
+            val o = JSONObject(raw)
+            o.keys().forEach { k -> out[k] = o.optString(k) }
+        } catch (_: Throwable) {
+        }
+        return out
+    }
+
+    private fun writeStrMap(ctx: Context, key: String, map: Map<String, String>) {
+        val o = JSONObject()
+        map.forEach { (k, v) -> o.put(k, v) }
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putString(key, o.toString()).apply()
     }
@@ -337,8 +475,8 @@ object PluginManager {
         val now = System.currentTimeMillis()
         loadAll(ctx).filter { it.enabled }.forEach { plugin ->
             if (plugin.isScript) {
-                // 脚本内容变了（用户改了文件/覆盖安装）也要重新加载，否则改动不生效
-                if (!PluginEngine.isLoadedFresh(plugin.id, plugin.scriptKey)) {
+                // 脚本来源变了（改了内联脚本 / 换了绑定文件 / 覆盖安装）也要重新加载
+                if (!PluginEngine.isLoadedFresh(plugin.id, scriptToken(ctx, plugin))) {
                     PluginEngine.load(ctx, plugin, host)
                 }
                 PluginEngine.fireEvent(ctx, plugin.id, event, payloadJson)

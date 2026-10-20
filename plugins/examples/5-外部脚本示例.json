@@ -1,0 +1,8 @@
+{
+  "id": "external-script-demo",
+  "name": "外部脚本示例",
+  "version": 1,
+  "enabled": true,
+  "capabilities": ["say", "log"],
+  "scriptFile": "hello-script.js"
+}

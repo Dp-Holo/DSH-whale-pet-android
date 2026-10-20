@@ -93,8 +93,16 @@ data class Plugin(
     val enabled: Boolean,
     val capabilities: Set<String>,
     val rules: List<PluginRule>,
-    /** 脚本型插件的 JS 源码；为空表示规则型（JSON 规则）。 */
+    /** 脚本型插件的 JS 源码；为空表示脚本不在 JSON 里（可能在外部文件，或规则型）。 */
     val script: String = "",
+    /**
+     * 外部脚本文件名（**元数据/展示用，不是路径**）。
+     *
+     * 真实文件由用户通过系统文件选择器绑定，App 只保存分区的 URI 授权，
+     * 因此这里只记录"用户自己的那个文件叫什么"，供界面展示。
+     * 为空表示该插件不涉及外部脚本文件。
+     */
+    val scriptFile: String? = null,
     /**
      * 脚本内容指纹（见 [PluginContentKey]）。
      *
@@ -103,9 +111,16 @@ data class Plugin(
      */
     val scriptKey: String = PluginContentKey.of(script)
 ) {
-    /** 是否脚本型插件。 */
+
+    /**
+     * 是否按脚本型处理。
+     *
+     * 注意：声明了 `scriptFile` 但还没绑定文件时**也算脚本型**——
+     * 否则它会被当成规则型插件（没有 rules）静默消失，用户完全不知道发生了什么。
+     * 这种情况下加载会失败并写审计说明原因。
+     */
     val isScript: Boolean
-        get() = script.isNotBlank()
+        get() = script.isNotBlank() || scriptFile != null
 
     companion object {
         /**
@@ -183,7 +198,14 @@ data class Plugin(
                     enabled = o.optBoolean("enabled", true),
                     capabilities = caps,
                     rules = rules,
-                    script = o.optString("script").trim()
+                    script = o.optString("script").trim(),
+                    // 只留文件名：这个字段是展示用的，即便写成了路径也不该被当路径用
+                    scriptFile = o.optString("scriptFile").trim()
+                        .takeIf { it.isNotEmpty() }
+                        ?.substringAfterLast('/')
+                        ?.substringAfterLast('\\')
+                        ?.trim()
+                        ?.takeIf { it.isNotEmpty() }
                 )
             }
         } catch (_: Throwable) {
