@@ -59,6 +59,11 @@ class MainActivity : AppCompatActivity() {
     /** 台词管理：当前编辑中的台词池（与本地存储同步）。 */
     private lateinit var llLines: LinearLayout
     private val lines = mutableListOf<String>()
+    /** 当前正在编辑的台词类别 */
+    private var lineType = WhaleLines.Type.NORMAL
+    private lateinit var tabLineNormal: Button
+    private lateinit var tabLineGain: Button
+    private lateinit var tabLineLoss: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -166,9 +171,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         // ── 台词管理（第二页）────────────────────────────────
-        lines.clear()
-        lines.addAll(WhaleLines.load(this))
-        renderLines()
+        tabLineNormal = findViewById(R.id.tab_line_normal)
+        tabLineGain = findViewById(R.id.tab_line_gain)
+        tabLineLoss = findViewById(R.id.tab_line_loss)
+        tabLineNormal.setOnClickListener { switchLineType(WhaleLines.Type.NORMAL) }
+        tabLineGain.setOnClickListener { switchLineType(WhaleLines.Type.GAIN) }
+        tabLineLoss.setOnClickListener { switchLineType(WhaleLines.Type.LOSS) }
+        switchLineType(WhaleLines.Type.NORMAL)
         findViewById<Button>(R.id.btn_add_line).setOnClickListener { showLineDialog(null) }
 
         // ── 底栏分页：主页 / 台词管理 / 设置 ──────────────────
@@ -214,6 +223,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ── 台词管理实现 ─────────────────────────────────────────
+
+    /** 切换台词类别（普通 / 充值 / 消费），并重新加载该类别列表。 */
+    private fun switchLineType(type: WhaleLines.Type) {
+        lineType = type
+        styleLineTab(tabLineNormal, type == WhaleLines.Type.NORMAL)
+        styleLineTab(tabLineGain, type == WhaleLines.Type.GAIN)
+        styleLineTab(tabLineLoss, type == WhaleLines.Type.LOSS)
+        lines.clear()
+        lines.addAll(WhaleLines.load(this, type))
+        renderLines()
+    }
+
+    private fun styleLineTab(btn: Button, active: Boolean) {
+        val attr = if (active) {
+            com.google.android.material.R.attr.colorPrimary
+        } else {
+            com.google.android.material.R.attr.colorOnSurfaceVariant
+        }
+        btn.setTextColor(MaterialColors.getColor(btn, attr))
+        btn.alpha = if (active) 1f else 0.7f
+    }
 
     /** 以条目形式渲染台词列表（每项右下角：🖊 编辑 / ❌ 删除）。 */
     private fun renderLines() {
@@ -272,7 +302,7 @@ class MainActivity : AppCompatActivity() {
 
     /** 保存到本机并刷新列表（桌宠服务每次说话都重新读取，无需重启即生效）。 */
     private fun persistLines() {
-        WhaleLines.save(this, lines)
+        WhaleLines.save(this, lineType, lines)
         renderLines()
     }
 

@@ -1258,8 +1258,10 @@ class WhalePetService : Service() {
             // 本次变化金额（减少为负、增加为正），保留两位小数
             val deltaAmount = amount.value - (prev ?: amount.value)
             if (decreased) {
-                // 先弹"吃掉"气泡，2.2 秒后再显示余额（两者互斥，串行才不会互相顶掉）
-                showBubbleWindow(getString(R.string.token_nibble_line), clearBadge = true)
+                // 余额减少：从「消费」类台词随机说一句（默认含「正在吃掉用户token...」）
+                val line = WhaleLines.load(this, WhaleLines.Type.LOSS).randomOrNull()
+                    ?: getString(R.string.token_nibble_line)
+                showBubbleWindow(line, clearBadge = true)
                 handler.postDelayed({ showBadge(balanceText) }, TOKEN_BUBBLE_DURATION_MS)
                 // 鲸鱼下方：红色 + 负号显示本次扣款
                 showDelta(
@@ -1272,8 +1274,11 @@ class WhalePetService : Service() {
                     "{\"value\":${amount.value},\"prev\":${prev ?: 0.0}}"
                 )
             } else {
-                // 余额增加（充值）：不弹"偷吃"，只显示新余额与增加金额
-                showBadge(balanceText)
+                // 余额增加：从「充值」类台词随机说一句，并显示新余额与增加金额
+                val line = WhaleLines.load(this, WhaleLines.Type.GAIN).randomOrNull()
+                    ?: getString(R.string.token_nibble_line)
+                showBubbleWindow(line, clearBadge = true)
+                handler.postDelayed({ showBadge(balanceText) }, TOKEN_BUBBLE_DURATION_MS)
                 showDelta(
                     String.format(Locale.ROOT, "+%.2f", deltaAmount),
                     DELTA_COLOR_GAIN

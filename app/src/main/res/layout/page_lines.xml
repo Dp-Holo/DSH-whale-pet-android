@@ -50,6 +50,55 @@
             android:text="@string/lines_hint"
             android:textSize="12sp" />
 
+        <!-- 台词分类：普通（单击）/ 充值（余额增加）/ 消费（余额减少） -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/tab_line_normal"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:insetBottom="0dp"
+                android:insetTop="0dp"
+                android:minHeight="32dp"
+                android:minWidth="0dp"
+                android:text="@string/line_type_normal"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/tab_line_gain"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:insetBottom="0dp"
+                android:insetTop="0dp"
+                android:minHeight="32dp"
+                android:minWidth="0dp"
+                android:text="@string/line_type_gain"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/tab_line_loss"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:insetBottom="0dp"
+                android:insetTop="0dp"
+                android:minHeight="32dp"
+                android:minWidth="0dp"
+                android:text="@string/line_type_loss"
+                android:textSize="12sp" />
+        </LinearLayout>
+
         <LinearLayout
             android:id="@+id/ll_lines"
             android:layout_width="match_parent"
