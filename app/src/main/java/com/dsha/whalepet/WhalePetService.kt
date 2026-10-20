@@ -699,10 +699,8 @@ class WhalePetService : Service() {
             }
             positionDeltaWindow()
             deltaTimer?.let(handler::removeCallbacks)
-            deltaTimer = Runnable {
-                deltaTv.animate().alpha(0f).setDuration(300).start()
-                handler.postDelayed({ hideDeltaWindow() }, 320)
-            }
+            // 与台词一致：显示约 2.2 秒后直接消失（不做淡出动画）
+            deltaTimer = Runnable { hideDeltaWindow() }
             handler.postDelayed(deltaTimer!!, 2_200L)
         } catch (_: Throwable) {
         }
@@ -824,6 +822,8 @@ class WhalePetService : Service() {
         overlayParams.y = y.roundToInt()
         safeUpdateLayout()
         if (bubbleVisible) positionBubbleWindow()
+        // 金额变化提示跟随鲸鱼移动（此前只加在拖动分支，游动时不动）
+        if (deltaVisible) positionDeltaWindow()
         // 临时诊断：每约 30 秒记录一行（按时间累计，避免高刷屏上触发过频）
         debugTickMs += scale * 16.67f
         if (debugTickMs >= 30_000f) {
@@ -1265,7 +1265,10 @@ class WhalePetService : Service() {
                 handler.postDelayed({ showBadge(balanceText) }, TOKEN_BUBBLE_DURATION_MS)
                 // 鲸鱼下方：红色 + 负号显示本次扣款
                 showDelta(
-                    String.format(Locale.ROOT, "-%.2f", -deltaAmount),
+                    getString(
+                        R.string.delta_loss_format,
+                        String.format(Locale.ROOT, "%.2f", -deltaAmount)
+                    ),
                     DELTA_COLOR_LOSS
                 )
                 // 插件事件：余额减少
@@ -1280,7 +1283,10 @@ class WhalePetService : Service() {
                 showBubbleWindow(line, clearBadge = true)
                 handler.postDelayed({ showBadge(balanceText) }, TOKEN_BUBBLE_DURATION_MS)
                 showDelta(
-                    String.format(Locale.ROOT, "+%.2f", deltaAmount),
+                    getString(
+                        R.string.delta_gain_format,
+                        String.format(Locale.ROOT, "%.2f", deltaAmount)
+                    ),
                     DELTA_COLOR_GAIN
                 )
             }
