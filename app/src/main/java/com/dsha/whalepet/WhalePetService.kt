@@ -65,6 +65,10 @@ class WhalePetService : Service() {
         /** 气泡显示时长（2.2 秒）+ 少量余量，用于「先弹提示、后显示余额」的串行安排 */
         private const val TOKEN_BUBBLE_DURATION_MS = 2_300L
 
+        /** 金额变化提示颜色：扣款红、增加绿 */
+        private const val DELTA_COLOR_LOSS = 0xFFE53935.toInt()
+        private const val DELTA_COLOR_GAIN = 0xFF43A047.toInt()
+
         /** 余额查询失败的日志节流：断网时避免每 3 秒写一行把日志刷爆 */
         private const val TOKEN_FAIL_LOG_INTERVAL_MS = 60_000L
 
@@ -184,6 +188,7 @@ class WhalePetService : Service() {
         } catch (_: Exception) {
         }
         hideBubbleWindow()
+        hideDeltaWindow()
         super.onDestroy()
     }
 
@@ -436,6 +441,13 @@ class WhalePetService : Service() {
     private lateinit var badgeTv: TextView
     private lateinit var badgeShadowTv: TextView
     private lateinit var bubbleParams: WindowManager.LayoutParams
+
+    // 金额变化提示（鲸鱼下方、纯文字、红/绿）
+    private lateinit var deltaWin: View
+    private lateinit var deltaTv: TextView
+    private lateinit var deltaParams: WindowManager.LayoutParams
+    private var deltaVisible = false
+    private var deltaTimer: Runnable? = null
     private var bubbleVisible = false
 
     private fun buildOverlay() {
@@ -494,6 +506,20 @@ class WhalePetService : Service() {
         ).apply {
             gravity = Gravity.TOP or Gravity.START
         }
+
+        // 金额变化提示窗（鲸鱼下方；纯文字无背景，字号与余额一致）
+        deltaWin = View.inflate(this, R.layout.overlay_delta, null)
+        deltaTv = deltaWin.findViewById(R.id.delta_text)
+        deltaParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+        }
     }
 
     // ── 触摸：拖动 + 单击/双击 ─────────────────────────────────
@@ -541,6 +567,7 @@ class WhalePetService : Service() {
                 ) {
                     positionBubbleWindow()
                 }
+                if (deltaVisible) positionDeltaWindow()
                 true
             }
             MotionEvent.ACTION_UP -> {
@@ -652,6 +679,59 @@ class WhalePetService : Service() {
         try {
             runCatching { wm.updateViewLayout(bubbleWin, bubbleParams) }
         } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * 显示本次余额变化金额（鲸鱼下方、纯文字、无气泡背景）。
+     *
+     * 显示时长与台词一致（约 2.2 秒），结束前淡出。红色为扣款（带负号），
+     * 绿色为增加（带正号）；字号与余额显示相同（12sp 加粗）。
+     */
+    private fun showDelta(text: String, color: Int) {
+        try {
+            deltaTv.text = text
+            deltaTv.setTextColor(color)
+            deltaTv.alpha = 1f
+            if (!deltaVisible) {
+                wm.addView(deltaWin, deltaParams)
+                deltaVisible = true
+            }
+            positionDeltaWindow()
+            deltaTimer?.let(handler::removeCallbacks)
+            deltaTimer = Runnable {
+                deltaTv.animate().alpha(0f).setDuration(300).start()
+                handler.postDelayed({ hideDeltaWindow() }, 320)
+            }
+            handler.postDelayed(deltaTimer!!, 2_200L)
+        } catch (_: Throwable) {
+        }
+    }
+
+    /** 把金额提示定位到鲸鱼本体正下方（超出屏幕时上移，保证可见）。 */
+    private fun positionDeltaWindow() {
+        if (!deltaVisible) return
+        val dm = resources.displayMetrics
+        val bw = deltaWin.width.takeIf { it > 0 } ?: (60 * dm.density).toInt()
+        val bh = deltaWin.height.takeIf { it > 0 } ?: (20 * dm.density).toInt()
+        val bodyBottom = y + windowPx - imgPad
+        val gap = 4 * dm.density
+        deltaParams.x = (x + windowPx / 2f - bw / 2f).toInt()
+            .coerceIn(0, (dm.widthPixels - bw).coerceAtLeast(0))
+        deltaParams.y = (bodyBottom + gap).toInt()
+            .coerceAtMost((dm.heightPixels - bh).coerceAtLeast(0))
+        runCatching { wm.updateViewLayout(deltaWin, deltaParams) }
+    }
+
+    private fun hideDeltaWindow() {
+        deltaTimer?.let(handler::removeCallbacks)
+        deltaTimer = null
+        if (deltaVisible) {
+            try {
+                wm.removeView(deltaWin)
+            } catch (_: Throwable) {
+            }
+            deltaVisible = false
         }
     }
 
@@ -1175,18 +1255,29 @@ class WhalePetService : Service() {
             }
 
             val balanceText = BalanceFetcher.formatAmount(amount)
+            // 本次变化金额（减少为负、增加为正），保留两位小数
+            val deltaAmount = amount.value - (prev ?: amount.value)
             if (decreased) {
-                // 先弹"偷吃"气泡，2.2 秒后再显示余额（两者互斥，串行才不会互相顶掉）
+                // 先弹"吃掉"气泡，2.2 秒后再显示余额（两者互斥，串行才不会互相顶掉）
                 showBubbleWindow(getString(R.string.token_nibble_line), clearBadge = true)
                 handler.postDelayed({ showBadge(balanceText) }, TOKEN_BUBBLE_DURATION_MS)
+                // 鲸鱼下方：红色 + 负号显示本次扣款
+                showDelta(
+                    String.format(Locale.ROOT, "-%.2f", -deltaAmount),
+                    DELTA_COLOR_LOSS
+                )
                 // 插件事件：余额减少
                 PluginEntry.onEvent(
                     this@WhalePetService, "balanceDecreased",
                     "{\"value\":${amount.value},\"prev\":${prev ?: 0.0}}"
                 )
             } else {
-                // 余额增加（充值）：不弹"偷吃"，只把新余额显示一次
+                // 余额增加（充值）：不弹"偷吃"，只显示新余额与增加金额
                 showBadge(balanceText)
+                showDelta(
+                    String.format(Locale.ROOT, "+%.2f", deltaAmount),
+                    DELTA_COLOR_GAIN
+                )
             }
             dumpDebug("tokenWatch: changed=true decreased=$decreased cur=${amount.currency}")
             // 有变化后冷却 1 分钟
