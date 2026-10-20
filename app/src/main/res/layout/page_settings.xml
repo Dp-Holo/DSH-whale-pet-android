@@ -51,14 +51,13 @@
             android:layout_marginTop="20dp"
             android:text="@string/notif_settings" />
 
-        <!-- 插件入口：1.1.0-Pre 特殊预览版按要求隐藏（保留控件与代码绑定，后续版本可一键恢复） -->
+        <!-- 插件入口（1.1.0-Pre 预览版曾临时隐藏，1.1.50 起恢复显示） -->
         <Button
             android:id="@+id/btn_plugins"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:text="@string/plugins_entry"
-            android:visibility="gone" />
+            android:text="@string/plugins_entry" />
 
         <!-- 关于鲸鱼娘桌宠（技术说明 + GitHub 链接） -->
         <Button
