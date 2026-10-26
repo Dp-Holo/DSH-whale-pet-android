@@ -43,6 +43,33 @@ class ConfirmReasonTest {
     }
 
     @Test
+    fun unavailableCarriesTheConcreteFailureReason() {
+        // 1.1.51 实机只看到"悬浮窗不可用，无法确认"，无法判断是权限、布局还是加窗失败
+        val detail = ConfirmReason.UNAVAILABLE.detailWith("加窗失败：BadTokenException: x")
+        assertTrue("应保留原说明", detail.contains(ConfirmReason.UNAVAILABLE.auditText()))
+        assertTrue("应附带具体原因", detail.contains("BadTokenException"))
+    }
+
+    @Test
+    fun otherReasonsIgnoreTheFailureDetail() {
+        // 用户拒绝/超时与"弹不出来"无关，不该被拼上异常文本
+        assertEquals(
+            ConfirmReason.USER_DENIED.auditText(),
+            ConfirmReason.USER_DENIED.detailWith("不该出现的异常")
+        )
+        assertEquals(
+            ConfirmReason.TIMEOUT.auditText(),
+            ConfirmReason.TIMEOUT.detailWith("不该出现的异常")
+        )
+    }
+
+    @Test
+    fun unavailableWithoutFailureFallsBackToPlainText() {
+        assertEquals(ConfirmReason.UNAVAILABLE.auditText(), ConfirmReason.UNAVAILABLE.detailWith(null))
+        assertEquals(ConfirmReason.UNAVAILABLE.auditText(), ConfirmReason.UNAVAILABLE.detailWith("  "))
+    }
+
+    @Test
     fun onlyAllowedRepresentsConsent() {
         // 除 ALLOWED 外都表示"没执行"，审计结果列应为 denied
         assertEquals(ConfirmReason.ALLOWED, ConfirmReason.valueOf("ALLOWED"))

@@ -36,4 +36,13 @@ enum class ConfirmReason {
         SERVICE_STOPPED -> "桌宠服务已停止，未执行"
         UNAVAILABLE -> "悬浮窗不可用，无法确认"
     }
+
+    /**
+     * 审计"详情"列的最终文本。
+     *
+     * [UNAVAILABLE] 会附带[具体失败原因][failure]（权限没开？布局解析失败？加窗失败？）——
+     * 只写"悬浮窗不可用"时，真机上完全无法判断卡在哪一步，排查只能靠猜。
+     */
+    fun detailWith(failure: String?): String =
+        if (this == UNAVAILABLE && !failure.isNullOrBlank()) "${auditText()}（$failure）" else auditText()
 }

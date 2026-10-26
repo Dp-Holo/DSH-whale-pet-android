@@ -587,8 +587,9 @@ object PluginManager {
             // 敏感操作：二次确认后才执行
             host.pluginConfirm(plugin.name, desc) { allowed, remember, reason ->
                 if (!allowed) {
-                    // 按真实原因记账：超时/被顶掉/服务停止都不等于"用户拒绝"
-                    audit(ctx, plugin.id, "call", desc, "denied", reason.auditText())
+                    // 按真实原因记账：超时/被顶掉/服务停止都不等于"用户拒绝"；
+                    // UNAVAILABLE 还要带上具体失败原因，否则真机上无从定位
+                    audit(ctx, plugin.id, "call", desc, "denied", reason.detailWith(PluginConfirmOverlay.lastFailure))
                 } else {
                     // 确认条最长挂起 15 秒。这段窗口里用户完全可能在管理页撤销授权、
                     // 停用或删除插件，然后回头点「允许」——不复查就等于让后到的拒绝失效。
