@@ -25,6 +25,7 @@
     <string name="auto_grant_failed">自动授权未生效，请点「授予悬浮窗权限」手动开启（%1$s）</string>
 
     <!-- 底栏与分页 -->
+    <string name="tab_plugins">插件</string>
     <string name="tab_home">主页</string>
     <string name="tab_lines">台词管理</string>
     <string name="tab_settings">设置</string>
@@ -78,6 +79,7 @@
     <string name="plugin_install_hint">粘贴插件 JSON</string>
     <string name="plugin_install">安装</string>
     <string name="plugin_install_sample">安装示例插件</string>
+    <string name="plugins_page_hint">插件可监听单击 / 双击 / 余额变化等事件；能力需授权，敏感操作每次确认，调用全程记录。</string>
     <string name="plugin_installed">已安装：%1$s</string>
     <string name="plugin_install_failed">安装失败：插件 id 不合法（只允许字母、数字与 . _ -）或 JSON 格式不正确</string>
     <string name="plugin_empty">暂无插件（可粘贴 JSON 或安装示例）</string>

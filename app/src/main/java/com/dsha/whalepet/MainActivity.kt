@@ -52,6 +52,8 @@ class MainActivity : AppCompatActivity() {
     /** 底栏分页 */
     private lateinit var tabHome: TextView
     private lateinit var tabLines: TextView
+    private lateinit var tabPlugins: TextView
+    private lateinit var llPlugins: LinearLayout
     private lateinit var tabSettings: TextView
     /** 自动授权尝试的节流时间戳（返回界面时最多每 5 分钟试一次） */
     private var lastAutoGrantAttemptAt = 0L
@@ -183,17 +185,26 @@ class MainActivity : AppCompatActivity() {
         // ── 底栏分页：主页 / 台词管理 / 设置 ──────────────────
         tabHome = findViewById(R.id.tab_home)
         tabLines = findViewById(R.id.tab_lines)
+        tabPlugins = findViewById(R.id.tab_plugins)
         tabSettings = findViewById(R.id.tab_settings)
-        tabHome.setOnClickListener { showPage(0) }
-        tabLines.setOnClickListener { showPage(1) }
-        tabSettings.setOnClickListener { showPage(2) }
-        showPage(0)
+        tabPlugins.setOnClickListener { showPage(0) }
+        tabHome.setOnClickListener { showPage(1) }
+        tabLines.setOnClickListener { showPage(2) }
+        tabSettings.setOnClickListener { showPage(3) }
+        showPage(1)
 
         // 关于鲸鱼娘桌宠（技术说明 + GitHub 链接）
         findViewById<Button>(R.id.btn_about).setOnClickListener { showAbout() }
 
-        // 插件管理：交给插件宿主（兼容层入口，App 本体不关心界面实现）
-        findViewById<Button>(R.id.btn_plugins).setOnClickListener { PluginEntry.showManager(this) }
+        // 插件页（独立 tab）：只调用插件宿主的公开 API，不改插件目录
+        llPlugins = findViewById(R.id.ll_plugins)
+        findViewById<Button>(R.id.btn_plugin_install).setOnClickListener {
+            PluginPage.showInstallDialog(this, llPlugins)
+        }
+        findViewById<Button>(R.id.btn_plugin_sample).setOnClickListener {
+            PluginPage.installSample(this, llPlugins)
+        }
+        PluginPage.render(this, llPlugins)
 
         // Shizuku：注册 binder 就绪/授权结果监听。binder 就绪后自动请求授权，
         // 已授权则直接自动授予悬浮窗 + 通知权限（免手动跳设置页）。
@@ -202,14 +213,16 @@ class MainActivity : AppCompatActivity() {
 
     // ── 底栏分页 ────────────────────────────────────────────
 
-    /** 切换页面：0=主页，1=台词管理，2=设置。 */
+    /** 切换页面：0=插件，1=主页，2=台词管理，3=设置。 */
     private fun showPage(index: Int) {
-        findViewById<View>(R.id.page_home).visibility = if (index == 0) View.VISIBLE else View.GONE
-        findViewById<View>(R.id.page_lines).visibility = if (index == 1) View.VISIBLE else View.GONE
-        findViewById<View>(R.id.page_settings).visibility = if (index == 2) View.VISIBLE else View.GONE
-        styleTab(tabHome, index == 0)
-        styleTab(tabLines, index == 1)
-        styleTab(tabSettings, index == 2)
+        findViewById<View>(R.id.page_plugins).visibility = if (index == 0) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.page_home).visibility = if (index == 1) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.page_lines).visibility = if (index == 2) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.page_settings).visibility = if (index == 3) View.VISIBLE else View.GONE
+        styleTab(tabPlugins, index == 0)
+        styleTab(tabHome, index == 1)
+        styleTab(tabLines, index == 2)
+        styleTab(tabSettings, index == 3)
     }
 
     private fun styleTab(tab: TextView, active: Boolean) {
