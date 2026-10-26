@@ -1,11 +1,11 @@
 package com.dsha.whalepet.plugin
 
 import android.content.Context
-import android.content.ContextThemeWrapper
 import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
