@@ -103,6 +103,8 @@
     <string name="plugin_script_pick_ok">脚本文件已绑定</string>
     <string name="plugin_script_pick_failed">脚本文件不可用（读取失败或超过 256KB）</string>
     <string name="plugin_script_pick_unsupported">当前界面不支持选择文件</string>
+    <string name="plugin_import_from_file">从文件导入插件</string>
+    <string name="plugin_import_read_failed">读取插件文件失败：%1$s</string>
 
     <string name="about_version_format">版本 %1$s</string>
     <string name="about_desc">由 DSHA（DeepSeek Harness Android）驱动 AI 模型编写并构建。模型随技术迭代更新，具体代际见仓库文档。</string>

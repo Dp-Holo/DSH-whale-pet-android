@@ -30,9 +30,13 @@ object PluginUi {
      */
     private const val SCRIPT_PICK_KEY = "whale-plugin-script-pick"
 
+    /** 导入插件 JSON 用的 key：与选脚本文件分开，结果不会串到对方回调里。 */
+    private const val IMPORT_PICK_KEY = "whale-plugin-import-json"
+
+    /** launcher 与 Activity 绑定：换 Activity 后旧 launcher 的回调会走空，必须重注册。 */
     private var pickerOwner: Activity? = null
-    private var picker: ActivityResultLauncher<Array<String>>? = null
-    private var onPicked: ((Uri?) -> Unit)? = null
+    private val pickers = mutableMapOf<String, ActivityResultLauncher<Array<String>>>()
+    private val pendingPicks = mutableMapOf<String, (Uri?) -> Unit>()
 
     /** 内置示例插件：只依赖 say，作为"链路是否通"的最小验证。 */
     private val SAMPLE_PLUGIN_JSON = """
@@ -53,7 +57,7 @@ object PluginUi {
             .setPositiveButton(R.string.plugin_install_sample) { _, _ ->
                 installPluginJson(activity, SAMPLE_PLUGIN_JSON)
             }
-            .setNeutralButton(R.string.plugin_install) { _, _ -> showPasteInstallDialog(activity) }
+            .setNeutralButton(R.string.plugin_install) { _, _ -> showInstallChooser(activity) }
             .setNegativeButton(R.string.cancel, null)
         if (plugins.isEmpty()) {
             builder.setMessage(R.string.plugin_empty)
@@ -142,20 +146,24 @@ object PluginUi {
      * 必须在 Activity 变更时重新注册：`activityResultRegistry` 是 Activity 私有的，
      * 旧 launcher 绑定的是旧 Activity 的 registry，回调会走空。
      */
-    private fun obtainPicker(activity: Activity): ActivityResultLauncher<Array<String>>? {
-        picker?.let { if (pickerOwner === activity) return it }
+    private fun obtainPicker(activity: Activity, key: String): ActivityResultLauncher<Array<String>>? {
+        if (pickerOwner !== activity) {
+            // 换了 Activity：旧 launcher 绑的是旧 registry，回调走空，全部重来
+            pickers.clear()
+            pendingPicks.clear()
+            pickerOwner = activity
+        }
+        pickers[key]?.let { return it }
         val component = activity as? ComponentActivity ?: return null
         return try {
             val launcher = component.activityResultRegistry.register(
-                SCRIPT_PICK_KEY,
+                key,
                 ActivityResultContracts.OpenDocument()
             ) { uri: Uri? ->
-                val callback = onPicked
-                onPicked = null
+                val callback = pendingPicks.remove(key)
                 callback?.invoke(uri)
             }
-            picker = launcher
-            pickerOwner = activity
+            pickers[key] = launcher
             launcher
         } catch (_: Throwable) {
             // 注册失败（极端情况）：退化为"不支持选择"，不要让界面崩掉
@@ -164,18 +172,40 @@ object PluginUi {
     }
 
     /**
-     * 启动系统文件选择器让用户选 `.js`。
+     * 打开系统文件选择器。
+     *
+     * @param key 注册 key，不同用途用不同 key，避免结果落到对方的回调里
+     * @param onResult 选中（或取消）后回调；取消时 uri 为 null
+     */
+    private fun pickFile(
+        activity: Activity,
+        key: String,
+        onResult: (Uri?) -> Unit
+    ) {
+        val launcher = obtainPicker(activity, key)
+        if (launcher == null) {
+            Toast.makeText(activity, R.string.plugin_script_pick_unsupported, Toast.LENGTH_LONG).show()
+            onResult(null)
+            return
+        }
+        pendingPicks[key] = onResult
+        try {
+            // 文件管理器对 .js/.json 的 MIME 判断普遍不可靠，统一放开 */*
+            launcher.launch(arrayOf("*/*"))
+        } catch (t: Throwable) {
+            pendingPicks.remove(key)
+            Toast.makeText(activity, R.string.plugin_script_pick_unsupported, Toast.LENGTH_LONG).show()
+            onResult(null)
+        }
+    }
+
+    /**
+     * 让用户选外部脚本文件（`.js`）。
      *
      * @param then 选完（或取消）后要接着做的事，安装后的"先选文件再授权"用它
      */
     private fun pickScriptFile(activity: Activity, p: Plugin, then: (() -> Unit)? = null) {
-        val launcher = obtainPicker(activity)
-        if (launcher == null) {
-            Toast.makeText(activity, R.string.plugin_script_pick_unsupported, Toast.LENGTH_LONG).show()
-            then?.invoke()
-            return
-        }
-        onPicked = { uri: Uri? ->
+        pickFile(activity, SCRIPT_PICK_KEY) { uri: Uri? ->
             if (uri == null) {
                 then?.invoke()
             } else {
@@ -194,14 +224,54 @@ object PluginUi {
                 }.start()
             }
         }
-        try {
-            // 很多文件管理器把 .js 标成 text/plain 或 application/octet-stream，用 */* 最稳
-            launcher.launch(arrayOf("*/*"))
-        } catch (t: Throwable) {
-            onPicked = null
-            Toast.makeText(activity, R.string.plugin_script_pick_unsupported, Toast.LENGTH_LONG).show()
-            then?.invoke()
+    }
+
+    /**
+     * 从系统文件选择器导入插件 JSON（省去手打/粘贴一长串）。
+     *
+     * 读到内容后走**与粘贴完全相同**的安装流程，所以能力授权、`scriptFile` 选文件、
+     * id 校验、覆盖安装清授权这些都自动继承，不会出现"导入的插件少了一道关"。
+     */
+    private fun importPluginFromFile(activity: Activity) {
+        pickFile(activity, IMPORT_PICK_KEY) { uri: Uri? ->
+            if (uri != null) {
+                // 读文件放后台：SAF 的 provider 可能是网盘，主线程读会 ANR
+                Thread {
+                    val (text, error) = PluginManager.readPickedText(activity, uri)
+                    activity.runOnUiThread {
+                        if (text == null) {
+                            Toast.makeText(
+                                activity,
+                                activity.getString(
+                                    R.string.plugin_import_read_failed, error ?: "未知原因"
+                                ),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } else {
+                            installPluginJson(activity, text)
+                        }
+                    }
+                }.start()
+            }
         }
+    }
+
+    /** 安装入口的二级选择：粘贴 JSON / 从文件导入。 */
+    private fun showInstallChooser(activity: Activity) {
+        val labels = arrayOf(
+            activity.getString(R.string.plugin_install_hint),
+            activity.getString(R.string.plugin_import_from_file)
+        )
+        AlertDialog.Builder(activity)
+            .setTitle(R.string.plugin_install)
+            .setItems(labels) { _, which ->
+                when (which) {
+                    0 -> showPasteInstallDialog(activity)
+                    1 -> importPluginFromFile(activity)
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     /** 能力授权：多选；敏感能力标注"每次需确认"；**未选择任何能力时不授权**。 */

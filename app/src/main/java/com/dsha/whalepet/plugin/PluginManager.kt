@@ -301,6 +301,16 @@ object PluginManager {
     }
 
     /**
+     * 读取用户通过系统文件选择器选中的**文本**文件（插件 JSON 与脚本共用）。
+     *
+     * 与脚本走同一套读取逻辑：UTF-8、上限 256KB、超限不把内容读进内存。
+     *
+     * @return (文本, 失败原因)，二者恰有一个非空
+     */
+    fun readPickedText(ctx: Context, uri: Uri): Pair<String?, String?> =
+        readScriptUri(ctx, uri.toString())
+
+    /**
      * 按 UTF-8 读取脚本文件，最多读 `上限+1` 字节（多读 1 字节用于判断是否超限，
      * 避免把整个超大文件读进内存）。
      *
