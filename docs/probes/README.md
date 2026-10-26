@@ -132,18 +132,26 @@
 
 ## 探针 4：联网能力（`probe-network.json`，1.1.51-Extension 起）
 
-**授权**：勾选「联网请求」（`network` 属**敏感能力**，每次调用会弹确认条，
-想省事就点「始终允许」）
+**授权**：勾选「联网请求」+「记录」（`network` 属**敏感能力**，点「始终允许」可免逐次询问）
 
-**操作**：双击鲸鱼娘（探针会连发两次请求 → 可能弹两次确认）
+**操作**：**双击两次**鲸鱼娘。探针按奇偶交替发两种请求，一次只发一个 ——
+连发两个会让前一个被后一个顶掉（实测 `denied | 被后来的确认请求顶替`），测不全。
+
+| 第几次双击 | 请求 | 是否弹确认条 |
+|---|---|---|
+| 1（奇） | `file:///etc/hosts` | **不弹**（协议预检在确认之前就拒了） |
+| 2（偶） | `https://www.baidu.com` | 弹 → 点「允许」 |
 
 **预期**：
 
 | 检查项 | 期望结果 |
 |---|---|
-| `file://` 协议 | 审计出现 `probe-network file协议 -> error: 只允许 http/https（收到：file）` |
-| `https` 请求 | 审计出现 `probe-network https -> {"ok":true,"status":200,...}` |
-| 审计里的 URL | **不含 query**（`call | 网络 GET：https://api.github.com/zen`） |
+| 第 1 次 | `call | 网络 GET：file:///etc/hosts | error | 只允许 http/https（收到：file）`，**且没有 `pending`** |
+| 第 2 次 | `call | 网络 GET：https://www.baidu.com | ok | status=200 …`，脚本日志拿到 `{"ok":true,"status":200,...}` |
+| 审计 URL | **不含 query**（密钥不会进日志） |
 
-**判定**：协议白名单拦住了 `file://`、https 请求拿到了 JSON 信封、且日志里看不到任何 query 参数
-→ 联网能力可用且边界正确。
+**判定**：`file://` 被预检直接拒且不打扰用户、https 拿到 200 信封 → 联网能力可用且边界正确。
+
+> **为什么用 baidu 而不是 GitHub API**：实测 `https://api.github.com/zen` 在该设备上
+> `error | connection closed`（网络到达不了），换成国内可达的站点才能验证能力本身，
+> 否则测的是网络环境而不是功能。

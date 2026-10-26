@@ -55,7 +55,7 @@ object PluginUi {
         val builder = AlertDialog.Builder(activity)
             .setTitle(R.string.plugins_title)
             .setPositiveButton(R.string.plugin_install_sample) { _, _ ->
-                installPluginJson(activity, SAMPLE_PLUGIN_JSON)
+                installPluginJson(activity, SAMPLE_PLUGIN_JSON, "内置示例")
             }
             .setNeutralButton(R.string.plugin_install) { _, _ -> showInstallChooser(activity) }
             .setNegativeButton(R.string.cancel, null)
@@ -248,7 +248,7 @@ object PluginUi {
                                 Toast.LENGTH_LONG
                             ).show()
                         } else {
-                            installPluginJson(activity, text)
+                            installPluginJson(activity, text, "文件导入")
                         }
                     }
                 }.start()
@@ -348,8 +348,8 @@ object PluginUi {
      * 声明了 `scriptFile` 的插件**先选脚本文件再授权**：没有脚本内容时，
      * 授权了也没有可执行的东西（`isScript` 为真但加载会失败）。
      */
-    private fun installPluginJson(activity: Activity, json: String) {
-        val p = PluginManager.install(activity, json)
+    private fun installPluginJson(activity: Activity, json: String, source: String = "粘贴") {
+        val p = PluginManager.install(activity, json, source)
         if (p == null) {
             Toast.makeText(activity, R.string.plugin_install_failed, Toast.LENGTH_LONG).show()
             return

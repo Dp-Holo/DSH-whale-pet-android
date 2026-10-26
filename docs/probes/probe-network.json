@@ -4,5 +4,5 @@
   "version": 1,
   "enabled": true,
   "capabilities": ["network", "log"],
-  "script": "on('doubleTap', function (c) { var bad = httpGet('file:///etc/hosts'); log('probe-network file协议 -> ' + bad); var good = httpGet('https://api.github.com/zen'); log('probe-network https -> ' + good); });"
+  "script": "var step = 0; on('doubleTap', function (c) { step = step + 1; if (step % 2 === 1) { var bad = httpGet('file:///etc/hosts'); log('probe-network 协议白名单 -> ' + bad); } else { var good = httpGet('https://www.baidu.com'); log('probe-network https -> ' + String(good).slice(0, 100)); } });"
 }

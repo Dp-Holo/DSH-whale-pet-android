@@ -163,21 +163,38 @@ object PluginManager {
     }
 
     /** 安装插件（覆盖同名文件）；解析失败返回 null。 */
-    fun install(ctx: Context, json: String): Plugin? {
-        val p = Plugin.parse(json) ?: return null
+    /**
+     * 安装（或覆盖安装）插件。
+     *
+     * @param source 来源，仅用于审计（`粘贴` / `文件导入`）——出问题时要能回答
+     *   "这个插件是怎么进来的"
+     */
+    fun install(ctx: Context, json: String, source: String = "粘贴"): Plugin? {
+        val p = Plugin.parse(json)
+        if (p == null) {
+            // 解析失败也要留痕：否则用户说"导入没反应"，日志里查不到任何东西
+            audit(ctx, "-", "manage", "安装插件（$source）", "error", "id 不合法或 JSON 格式不正确")
+            return null
+        }
         return try {
             val target = File(dir(ctx), "${p.id}.json")
+            val overwrite = target.exists()
             // 覆盖安装必须先清空旧授权。授权（含"始终允许"）是按 pluginId 存储的，
             // 若沿用旧记录，新脚本会直接继承上一份脚本的全部能力——用户从外部
             // 粘贴一个同 id 的 JSON，就等于跳过了授权确认这一步。
-            if (target.exists()) {
+            if (overwrite) {
                 revokeAll(ctx, p.id)
             }
             target.writeText(json)
             invalidateCache()
             PluginEngine.unload(p.id)          // 覆盖安装后强制重新加载
+            audit(
+                ctx, p.id, "manage", "安装插件（$source）", "ok",
+                if (overwrite) "覆盖安装，已清空旧授权" else ""
+            )
             p
-        } catch (_: Throwable) {
+        } catch (t: Throwable) {
+            audit(ctx, p.id, "manage", "安装插件（$source）", "error", t.message ?: t.javaClass.simpleName)
             null
         }
     }
@@ -592,6 +609,16 @@ object PluginManager {
         if (cap !in granted(ctx, plugin.id)) {
             audit(ctx, plugin.id, "call", desc, "denied", "未授权能力：${PluginCaps.label(cap)}")
             return "denied: 未授权 ${PluginCaps.label(cap)}"
+        }
+        if (cap == PluginCaps.NETWORK) {
+            // 校验放到**确认之前**：让用户批准一个注定发不出去的请求毫无意义，
+            // 而且实测中它还会把真正的确认请求顶掉（前一个被 SUPERSEDED）。
+            val method = if (action == "httpGet") "GET" else "POST"
+            val check = NetworkPolicy.check(method, args.getOrElse(0) { "" })
+            if (check is NetworkPolicy.Check.Reject) {
+                audit(ctx, plugin.id, "call", desc, "error", check.reason)
+                return "error: ${check.reason}"
+            }
         }
         if (cap in PluginCaps.SENSITIVE && !isAlwaysAllowed(ctx, plugin.id, cap)) {
             // 敏感操作：二次确认后才执行
