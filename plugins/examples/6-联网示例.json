@@ -1,0 +1,8 @@
+{
+  "id": "network-demo",
+  "name": "联网示例",
+  "version": 1,
+  "enabled": true,
+  "capabilities": ["network", "say", "log"],
+  "script": "on('doubleTap', function (ctx) { var r = JSON.parse(httpGet('https://api.github.com/zen')); if (r.ok) { say(String(r.body).slice(0, 40)); } else { log('网络失败：' + (r.error || ('HTTP ' + r.status))); } });"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "probe-network",
+  "name": "探针4：联网能力",
+  "version": 1,
+  "enabled": true,
+  "capabilities": ["network", "log"],
+  "script": "on('doubleTap', function (c) { var bad = httpGet('file:///etc/hosts'); log('probe-network file协议 -> ' + bad); var good = httpGet('https://api.github.com/zen'); log('probe-network https -> ' + good); });"
+}

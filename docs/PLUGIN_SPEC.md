@@ -149,7 +149,40 @@ on('balanceDecreased', function (ctx) {
 | `openUrl(url)` | `openUrl` | 完整 URL（需带 scheme） | ✅ | `ok` / `error: 无法打开` |
 | `openApp(pkg)` | `openApp` | 应用包名 | ✅ | `ok` / `error: 应用不存在` |
 | `shizuku(...args)` | `shizuku` | 白名单命令参数 | ✅ | 命令输出诊断串（见 §5） |
+| `httpGet(url)` | `network` | 完整 http(s) URL | ✅ | JSON 信封（见下） |
+| `httpPost(url, body)` | `network` | URL、正文（UTF-8） | ✅ | JSON 信封（见下） |
 | `log(text)` | —（无需能力） | 文本 | 否 | `ok` |
+
+#### 联网：`httpGet` / `httpPost`
+
+**返回值是 JSON 字符串**，用 `JSON.parse` 取用：
+
+```js
+var r = JSON.parse(httpGet('https://api.example.com/zen'));
+if (r.ok) { say(r.body); } else { log('请求失败：' + (r.error || ('HTTP ' + r.status))); }
+```
+
+| 字段 | 含义 |
+|---|---|
+| `ok` | HTTP 状态码在 200~299 时为 `true`（4xx/5xx 也是"拿到响应"，但 `ok=false`） |
+| `status` | HTTP 状态码；请求根本没发出去时不存在该字段 |
+| `body` | 响应正文（UTF-8；超过上限会被截断） |
+| `truncated` | 仅在被截断时出现且为 `true` |
+| `error` | 请求没发出去时的原因（DNS/超时/证书等） |
+
+**限制**（不是任意 socket）：
+
+| 项 | 限制 |
+|---|---|
+| 协议 | 只 `http` / `https`（`file:`、`content:`、`javascript:` 一律拒绝） |
+| 方法 | 只 `GET` / `POST`（不支持 PUT/DELETE/PATCH） |
+| 响应大小 | 64KB，超出截断并标 `truncated` |
+| 超时 | 连接/读取各 8 秒 |
+| 频率 | **同一插件最小间隔 1 秒**，更频繁的调用直接拒绝（审计记 `denied`） |
+| 隐私 | 审计只记 **scheme://host[:port]/path**，**丢弃 query 与 URL 里的账号密码**——密钥不会被写进日志 |
+
+**敏感能力**：与其他"把东西送出去"的能力一致，首次调用会弹确认条；
+选择「始终允许」后该插件不再逐次询问（适合定时轮询类插件）。
 
 **返回值语义**（脚本可据此分支）：
 | 返回 | 含义 |
@@ -209,7 +242,7 @@ on('balanceDecreased', function (ctx) {
 - ❌ 任何 Java 类：`Packages`、`java`、`javax`、`org`、`com`… 全局已删除
 - ❌ `__bridge.getClass()` / `getClassLoader()` 等反射逃逸（白名单只放行 `__bridge` 与
   `java.lang.String`；反射的必经节点 `java.lang.Class` / `ClassLoader` 一律被拒）
-- ❌ 文件读写、网络请求（未提供对应 API）
+- ❌ 文件读写（未提供 API）；**网络只能走 §3 的 `httpGet` / `httpPost`**，没有任意 socket / 原始 TCP
 - ❌ 其它插件的作用域（每个插件独立作用域，互不可见）
 
 **执行限制**：单次执行最多 **500 万条指令**，超时会被强制中止（抛错、写审计），脚本的 `try/catch` 拦不住。
@@ -283,6 +316,7 @@ MM-dd HH:mm:ss | 插件id | 事件或动作类别 | 动作描述 | 结果 | 详�
 | 1.1.47 | 授权框改为**全量替换**（取消勾选真正生效）；被撤销能力的"始终允许"一并清除；处理函数抛异常与非正常中止都会写审计 | 取消勾选后对应能力立刻失效；调试时能在日志看到报错原因 |
 | 1.1.47-Extension | 修正沙箱白名单：放行 `java.lang.String`；能力返回值转为普通 JS 字符串 | 1.1.29 起"能力生效但脚本随即被中断"的问题修复；`say(...) === 'ok'` 这类比较现在成立 |
 | 1.1.51-Extension | 支持外部脚本文件 `scriptFile`（SAF 选择 + 持久授权，上限 256KB）；优先级 文件 > 内联 > 规则 | 复杂脚本不必再挤成一行；文件失效时有审计与提示，并能回退内联脚本 |
+| 1.1.51-Extension | 新增 `network` 能力：`httpGet` / `httpPost`（http(s) 限定、GET/POST、64KB、8s 超时、每插件 1s 节流、审计抹掉 query） | 插件可联网（天气、webhook）；属敏感能力，首次需确认，可选「始终允许」 |
 
 > 1.1.47 起沙箱与指令上限有 JVM 回归测试（`ScriptSandboxTest`），
 > 不再只依赖 `docs/probes/` 的人工探针。

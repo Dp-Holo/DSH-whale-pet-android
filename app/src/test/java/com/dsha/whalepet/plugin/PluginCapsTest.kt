@@ -13,9 +13,10 @@ import org.junit.Test
 class PluginCapsTest {
 
     @Test
-    fun sensitiveSetIsExactlyOpenUrlOpenAppAndShizuku() {
+    fun sensitiveSetIsExactlyTheOutboundCapabilities() {
+        // 这四项都会"把东西送出去"（打开网页/应用、执行系统命令、联网），必须每次确认
         assertEquals(
-            setOf(PluginCaps.OPEN_URL, PluginCaps.OPEN_APP, PluginCaps.SHIZUKU),
+            setOf(PluginCaps.OPEN_URL, PluginCaps.OPEN_APP, PluginCaps.SHIZUKU, PluginCaps.NETWORK),
             PluginCaps.SENSITIVE
         )
     }
@@ -29,7 +30,7 @@ class PluginCapsTest {
 
     @Test
     fun allCapabilitiesCoverTheSensitiveOnes() {
-        assertEquals(6, PluginCaps.ALL.size)
+        assertEquals(7, PluginCaps.ALL.size)
         assertTrue(PluginCaps.ALL.containsAll(PluginCaps.SENSITIVE))
     }
 
@@ -49,6 +50,9 @@ class PluginCapsTest {
         assertEquals(PluginCaps.OPEN_URL, PluginAction(type = "openUrl").capability)
         assertEquals(PluginCaps.OPEN_APP, PluginAction(type = "openApp").capability)
         assertEquals(PluginCaps.SHIZUKU, PluginAction(type = "shizuku").capability)
+        // 联网两个动作共用 network 能力
+        assertEquals(PluginCaps.NETWORK, PluginAction(type = "httpGet").capability)
+        assertEquals(PluginCaps.NETWORK, PluginAction(type = "httpPost").capability)
         // 纯记录与未知动作不需要能力
         assertEquals("", PluginAction(type = "log").capability)
         assertEquals("", PluginAction(type = "unknown").capability)
@@ -63,6 +67,7 @@ class PluginCapsTest {
                 PluginCaps.VIBRATE -> PluginAction(type = "vibrate", ms = 200L).describe()
                 PluginCaps.OPEN_URL -> PluginAction(type = "openUrl", url = "https://x.com").describe()
                 PluginCaps.OPEN_APP -> PluginAction(type = "openApp", pkg = "com.x").describe()
+                PluginCaps.NETWORK -> PluginAction(type = "httpGet", url = "https://x.com/a").describe()
                 else -> PluginAction(type = "shizuku", args = listOf("pm", "grant")).describe()
             }
             assertTrue("能力 $cap 的动作描述为空", desc.isNotBlank())
@@ -73,7 +78,9 @@ class PluginCapsTest {
 
     @Test
     fun everyCapabilityIsReachableFromSomeAction() {
-        val actions = listOf("say", "notify", "vibrate", "openUrl", "openApp", "shizuku")
+        val actions = listOf(
+            "say", "notify", "vibrate", "openUrl", "openApp", "shizuku", "httpGet", "httpPost"
+        )
         assertEquals(
             "PluginCaps.ALL 与 ofAction 的映射不一致：新增能力后忘了登记动作",
             PluginCaps.ALL,
@@ -91,7 +98,10 @@ class PluginCapsTest {
     @Test
     fun pluginActionCapabilityUsesTheSameMapping() {
         // 两处若各写一份 when，容易出现"声明了能力却永远被判未授权"
-        listOf("say", "notify", "vibrate", "openUrl", "openApp", "shizuku", "log", "unknown")
+        listOf(
+            "say", "notify", "vibrate", "openUrl", "openApp", "shizuku",
+            "httpGet", "httpPost", "log", "unknown"
+        )
             .forEach { type ->
                 assertEquals(
                     "动作 $type 的能力映射不一致",

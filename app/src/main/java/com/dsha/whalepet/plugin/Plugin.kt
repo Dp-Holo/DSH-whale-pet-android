@@ -13,11 +13,17 @@ object PluginCaps {
     const val OPEN_URL = "openUrl"
     const val OPEN_APP = "openApp"
     const val SHIZUKU = "shizuku"
+    const val NETWORK = "network"
 
-    /** 敏感能力：执行前需要用户二次确认。 */
-    val SENSITIVE: Set<String> = setOf(OPEN_URL, OPEN_APP, SHIZUKU)
+    /**
+     * 敏感能力：执行前需要用户二次确认（可「始终允许」记住）。
+     *
+     * `network` 也算敏感：它把数据发往任意主机，是插件里唯一能"把东西送出去"的能力。
+     * 用户确认一次后按「始终允许」即可，不必每次轮询都弹。
+     */
+    val SENSITIVE: Set<String> = setOf(OPEN_URL, OPEN_APP, SHIZUKU, NETWORK)
 
-    val ALL: Set<String> = setOf(SAY, NOTIFY, VIBRATE, OPEN_URL, OPEN_APP, SHIZUKU)
+    val ALL: Set<String> = setOf(SAY, NOTIFY, VIBRATE, OPEN_URL, OPEN_APP, SHIZUKU, NETWORK)
 
     fun label(cap: String): String = when (cap) {
         SAY -> "让鲸鱼娘说话"
@@ -26,6 +32,7 @@ object PluginCaps {
         OPEN_URL -> "打开网页"
         OPEN_APP -> "打开其他应用"
         SHIZUKU -> "执行系统命令（Shizuku）"
+        NETWORK -> "联网请求（httpGet / httpPost）"
         else -> cap
     }
 
@@ -43,6 +50,7 @@ object PluginCaps {
         OPEN_URL -> OPEN_URL
         OPEN_APP -> OPEN_APP
         SHIZUKU -> SHIZUKU
+        "httpGet", "httpPost" -> NETWORK
         else -> ""
     }
 }

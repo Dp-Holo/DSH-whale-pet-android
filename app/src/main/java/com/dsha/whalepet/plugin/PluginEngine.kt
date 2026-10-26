@@ -184,6 +184,8 @@ object PluginEngine {
         fun vibrate(ms: String): String = call("vibrate", listOf(ms))
         fun openUrl(url: String): String = call("openUrl", listOf(url))
         fun openApp(pkg: String): String = call("openApp", listOf(pkg))
+        fun httpGet(url: String): String = call("httpGet", listOf(url))
+        fun httpPost(url: String, body: String): String = call("httpPost", listOf(url, body))
         fun shizuku(joined: String): String = call("shizuku", joined.split('\u0001'))
         fun log(text: String): String = call("log", listOf(text))
 

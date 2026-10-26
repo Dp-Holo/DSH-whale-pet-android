@@ -127,3 +127,23 @@
 
 > 说明：探针 2 当前仍有"中止无审计记录"的缺口，需插件方补一条 `error` 记录后再作为完整判据。
 
+
+---
+
+## 探针 4：联网能力（`probe-network.json`，1.1.51-Extension 起）
+
+**授权**：勾选「联网请求」（`network` 属**敏感能力**，每次调用会弹确认条，
+想省事就点「始终允许」）
+
+**操作**：双击鲸鱼娘（探针会连发两次请求 → 可能弹两次确认）
+
+**预期**：
+
+| 检查项 | 期望结果 |
+|---|---|
+| `file://` 协议 | 审计出现 `probe-network file协议 -> error: 只允许 http/https（收到：file）` |
+| `https` 请求 | 审计出现 `probe-network https -> {"ok":true,"status":200,...}` |
+| 审计里的 URL | **不含 query**（`call | 网络 GET：https://api.github.com/zen`） |
+
+**判定**：协议白名单拦住了 `file://`、https 请求拿到了 JSON 信封、且日志里看不到任何 query 参数
+→ 联网能力可用且边界正确。

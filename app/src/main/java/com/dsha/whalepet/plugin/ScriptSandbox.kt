@@ -99,6 +99,8 @@ object ScriptSandbox {
         function vibrate(ms) { return String(__bridge.vibrate(String(ms))); }
         function openUrl(u) { return String(__bridge.openUrl(String(u))); }
         function openApp(p) { return String(__bridge.openApp(String(p))); }
+        function httpGet(u) { return String(__bridge.httpGet(String(u))); }
+        function httpPost(u, b) { return String(__bridge.httpPost(String(u), String(b == null ? '' : b))); }
         function shizuku() {
           var a = [];
           for (var i = 0; i < arguments.length; i++) { a.push(String(arguments[i])); }

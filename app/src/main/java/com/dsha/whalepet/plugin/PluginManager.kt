@@ -67,6 +67,9 @@ object PluginManager {
     /** 规则触发的冷却记录：`pluginId#ruleIndex` → 上次触发时间。 */
     private val lastFire = ConcurrentHashMap<String, Long>()
 
+    /** 联网调用的节流记录：pluginId → 上次请求时间。 */
+    private val lastNetCall = ConcurrentHashMap<String, Long>()
+
     /**
      * 规则型动作与敏感确认回调的执行线程。
      *
@@ -206,6 +209,7 @@ object PluginManager {
                 // （install 只在"文件已存在"时 revoke，文件已被删的情况挡不住）
                 revokeAll(ctx, id)
                 lastFire.keys.removeAll { it.startsWith("$id#") }
+                lastNetCall.remove(id)
             }
             // 删除是最关键的管理操作之一，必须留痕
             audit(ctx, id, "manage", "删除插件", if (deleted) "ok" else "error")
@@ -505,6 +509,21 @@ object PluginManager {
      * `lastFire` 只增不减会慢慢堆积（插件/规则删掉后键还留着）。
      * 超过上限时丢掉已经过期的条目——仍在冷却窗口内的记录必须保留，否则节流失效。
      */
+    /**
+     * 同一插件的最小联网间隔；返回 false 表示本次应拒绝。
+     *
+     * 防止插件把 `tap` 之类的频繁事件绑成请求风暴（打别人服务器、也把自己的电刷光）。
+     */
+    @Synchronized
+    private fun allowNetworkCall(pluginId: String): Boolean {
+        val now = System.currentTimeMillis()
+        val last = lastNetCall[pluginId] ?: 0L
+        // 时钟回拨时按"允许"处理，否则会永久卡死
+        if (now >= last && now - last < NetworkPolicy.MIN_INTERVAL_MS) return false
+        lastNetCall[pluginId] = now
+        return true
+    }
+
     private fun pruneLastFire(now: Long) {
         if (lastFire.size <= RuleThrottle.MAX_TRACKED_RULES) return
         val cutoff = now - RuleThrottle.RETENTION_MS
@@ -533,6 +552,8 @@ object PluginManager {
         "openUrl" -> "打开网页：${args.getOrElse(0) { "" }}"
         "openApp" -> "打开应用：${args.getOrElse(0) { "" }}"
         "shizuku" -> "执行系统命令：${args.joinToString(" ")}"
+        "httpGet" -> "网络 GET：${NetworkPolicy.auditUrl(args.getOrElse(0) { "" })}"
+        "httpPost" -> "网络 POST：${NetworkPolicy.auditUrl(args.getOrElse(0) { "" })}"
         "log" -> "记录：${args.getOrElse(0) { "" }}"
         else -> "未知动作：$action"
     }
@@ -640,6 +661,30 @@ object PluginManager {
                 // 此前结果写死 ok，等于把安全拦截记成了"执行成功"，日志里完全看不出来。
                 audit(ctx, plugin.id, "call", desc, r.auditResult, r.message)
                 r.message
+            }
+            "httpGet", "httpPost" -> {
+                val method = if (action == "httpGet") "GET" else "POST"
+                val url = args.getOrElse(0) { "" }
+                when (val check = NetworkPolicy.check(method, url)) {
+                    is NetworkPolicy.Check.Reject -> {
+                        audit(ctx, plugin.id, "call", desc, "error", check.reason)
+                        "error: ${check.reason}"
+                    }
+                    NetworkPolicy.Check.Ok -> {
+                        if (!allowNetworkCall(plugin.id)) {
+                            val reason = "请求过于频繁（同一插件最小间隔 ${NetworkPolicy.MIN_INTERVAL_MS}ms）"
+                            audit(ctx, plugin.id, "call", desc, "denied", reason)
+                            "error: 请求过于频繁"
+                        } else {
+                            // 阻塞式：调用方已在后台线程（脚本线程 / 插件管理 worker）
+                            val r = NetworkClient.request(
+                                method, url, if (method == "POST") args.getOrElse(1) { "" } else null
+                            )
+                            audit(ctx, plugin.id, "call", desc, r.auditResult, r.auditDetail())
+                            r.envelope
+                        }
+                    }
+                }
             }
             else -> {
                 audit(ctx, plugin.id, "call", desc, "error", "未知动作")
