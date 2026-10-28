@@ -33,7 +33,7 @@
 
     <!-- 台词管理 -->
     <string name="lines_title">台词管理</string>
-    <string name="lines_hint">点右上角 ➕ 添加；🖊 编辑、❌ 删除。上方可切换三类台词：普通（单击时说）、充值（余额增加时说）、消费（余额减少时说）。</string>
+    <string name="lines_hint">点右上角 ＋ 添加；✎ 编辑、✕ 删除。上方可切换三类台词：普通（单击时说）、充值（余额增加时说）、消费（余额减少时说）。</string>
     <string name="delta_loss_format">余额-%1$s¥</string>
     <string name="delta_gain_format">余额+%1$s¥</string>
     <string name="line_type_normal">普通</string>

@@ -99,6 +99,8 @@ class WhalePetService : Service() {
     private var debugTickMs = 0f
     /** 布局更新失败日志的节流时间戳（失败可能每帧发生，避免刷屏） */
     private var layoutFailLoggedAt = 0L
+    /** 布局失败后的游动恢复任务（窗口恢复后自动继续，避免一直静止） */
+    private var wanderResumeRunnable: Runnable? = null
     private var balanceRunnable: Runnable? = null
     // 余额消耗检测（每 3 秒静默查询，结果不显示）
     private var tokenWatchRunnable: Runnable? = null
@@ -178,6 +180,8 @@ class WhalePetService : Service() {
         batteryWatchRunnable?.let(handler::removeCallbacks)
         badgeTimer?.let(handler::removeCallbacks)
         bubbleTimer?.let(handler::removeCallbacks)
+        wanderResumeRunnable?.let(handler::removeCallbacks)
+        deltaTimer?.let(handler::removeCallbacks)
         try {
             unregisterReceiver(batteryReceiver)
             unregisterReceiver(screenReceiver)
@@ -748,6 +752,7 @@ class WhalePetService : Service() {
     // ── 自主游动（角度制，防抖）───────────────────────────────
     private fun startWander() {
         if (wanderRunning) return
+        wanderResumeRunnable?.let(handler::removeCallbacks)
         wanderRunning = true
         lastFrameNanos = 0L
         val cb = object : Choreographer.FrameCallback {
@@ -801,7 +806,22 @@ class WhalePetService : Service() {
                 layoutFailLoggedAt = now
                 dumpDebug("updateLayout failed: ${t.javaClass.simpleName}")
             }
+            // 自动恢复：窗口可能只是暂时不可用。5 秒后若服务仍在且亮屏就重启游动，
+            // 否则会一直静止到用户息屏再亮屏（表现为「卡死一段时间后恢复」）。
+            scheduleWanderResume()
         }
+    }
+
+    /** 安排一次游动恢复尝试（布局失败后使用，避免永久静止）。 */
+    private fun scheduleWanderResume() {
+        wanderResumeRunnable?.let(handler::removeCallbacks)
+        wanderResumeRunnable = Runnable {
+            if (isRunning && !wanderRunning && isScreenOn()) {
+                startWander()
+                dumpDebug("wander resumed after layout failure")
+            }
+        }
+        handler.postDelayed(wanderResumeRunnable!!, 5_000L)
     }
 
     private fun stepWander(scale: Float = 1f) {
