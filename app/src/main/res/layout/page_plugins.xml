@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 插件页（在主页左边）：标题 + 安装入口 + 插件列表（列表由代码动态填充） -->
+<!-- 插件页（在主页左边）：标题 + 说明 + 安装入口（下移并放大的两个大按钮）+ 插件列表（代码动态填充） -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -11,6 +11,7 @@
         android:orientation="vertical"
         android:padding="24dp">
 
+        <!-- 标题行：只留标题与"安装示例"（次要操作，保持小尺寸，不跟主操作抢位置） -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -38,36 +39,6 @@
                 android:paddingRight="10dp"
                 android:text="@string/plugin_install_sample"
                 android:textSize="12sp" />
-
-            <Button
-                android:id="@+id/btn_plugin_install"
-                style="?attr/materialButtonOutlinedStyle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:insetBottom="0dp"
-                android:insetTop="0dp"
-                android:minHeight="32dp"
-                android:minWidth="0dp"
-                android:paddingLeft="10dp"
-                android:paddingRight="10dp"
-                android:text="@string/plugin_install"
-                android:textSize="12sp" />
-
-            <Button
-                android:id="@+id/btn_plugin_import"
-                style="?attr/materialButtonOutlinedStyle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:insetBottom="0dp"
-                android:insetTop="0dp"
-                android:minHeight="32dp"
-                android:minWidth="0dp"
-                android:paddingLeft="10dp"
-                android:paddingRight="10dp"
-                android:text="@string/plugin_import_from_file"
-                android:textSize="12sp" />
         </LinearLayout>
 
         <TextView
@@ -77,6 +48,41 @@
             android:alpha="0.7"
             android:text="@string/plugins_page_hint"
             android:textSize="12sp" />
+
+        <!-- 安装入口：从标题行下移到这里，两个等宽大按钮（等宽 + 48dp 高，比较好按、字也看得清） -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn_plugin_install"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:insetBottom="0dp"
+                android:insetTop="0dp"
+                android:minHeight="48dp"
+                android:minWidth="0dp"
+                android:text="@string/plugin_install"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btn_plugin_import"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:insetBottom="0dp"
+                android:insetTop="0dp"
+                android:minHeight="48dp"
+                android:minWidth="0dp"
+                android:text="@string/plugin_import_from_file"
+                android:textSize="14sp" />
+        </LinearLayout>
 
         <LinearLayout
             android:id="@+id/ll_plugins"
