@@ -54,44 +54,29 @@
 
             <Button
                 android:id="@+id/tab_line_normal"
-                style="?attr/materialButtonOutlinedStyle"
+                style="@style/Widget.WhalePet.Button"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:insetBottom="0dp"
-                android:insetTop="0dp"
-                android:minHeight="32dp"
-                android:minWidth="0dp"
-                android:text="@string/line_type_normal"
-                android:textSize="12sp" />
+                android:text="@string/line_type_normal" />
 
             <Button
                 android:id="@+id/tab_line_gain"
-                style="?attr/materialButtonOutlinedStyle"
+                style="@style/Widget.WhalePet.Button"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
                 android:layout_weight="1"
-                android:insetBottom="0dp"
-                android:insetTop="0dp"
-                android:minHeight="32dp"
-                android:minWidth="0dp"
-                android:text="@string/line_type_gain"
-                android:textSize="12sp" />
+                android:text="@string/line_type_gain" />
 
             <Button
                 android:id="@+id/tab_line_loss"
-                style="?attr/materialButtonOutlinedStyle"
+                style="@style/Widget.WhalePet.Button"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
                 android:layout_weight="1"
-                android:insetBottom="0dp"
-                android:insetTop="0dp"
-                android:minHeight="32dp"
-                android:minWidth="0dp"
-                android:text="@string/line_type_loss"
-                android:textSize="12sp" />
+                android:text="@string/line_type_loss" />
         </LinearLayout>
 
         <LinearLayout

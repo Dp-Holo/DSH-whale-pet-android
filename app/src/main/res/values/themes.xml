@@ -14,4 +14,22 @@
         <item name="colorOnPrimaryContainer">#22315E</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
     </style>
+
+    <!--
+      全应用**唯一**的按钮样式：主页 / 设置 / 台词管理 / 插件 四个页面共用。
+
+      为什么收敛成一种：此前主页与设置用 Material 默认实心按钮（跟着 system 尺寸走），
+      台词与插件页各自写 style="?attr/materialButtonOutlinedStyle" 再手工调
+      minHeight/textSize/inset，尺寸与观感两套并存、后续页面还会继续漂移。
+      统一到这里以后，新页面只写 style="@style/Widget.WhalePet.Button"，
+      间距与尺寸由样式负责，布局里只留 layout_* 布局属性。
+    -->
+    <style name="Widget.WhalePet.Button" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:minHeight">48dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
 </resources>

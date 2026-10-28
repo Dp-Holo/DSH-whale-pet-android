@@ -28,17 +28,12 @@
 
             <Button
                 android:id="@+id/btn_plugin_sample"
-                style="?attr/materialButtonOutlinedStyle"
+                style="@style/Widget.WhalePet.Button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:insetBottom="0dp"
-                android:insetTop="0dp"
-                android:minHeight="32dp"
-                android:minWidth="0dp"
                 android:paddingLeft="10dp"
                 android:paddingRight="10dp"
-                android:text="@string/plugin_install_sample"
-                android:textSize="12sp" />
+                android:text="@string/plugin_install_sample" />
         </LinearLayout>
 
         <TextView
@@ -58,30 +53,20 @@
 
             <Button
                 android:id="@+id/btn_plugin_install"
-                style="?attr/materialButtonOutlinedStyle"
+                style="@style/Widget.WhalePet.Button"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:insetBottom="0dp"
-                android:insetTop="0dp"
-                android:minHeight="48dp"
-                android:minWidth="0dp"
-                android:text="@string/plugin_install"
-                android:textSize="14sp" />
+                android:text="@string/plugin_install" />
 
             <Button
                 android:id="@+id/btn_plugin_import"
-                style="?attr/materialButtonOutlinedStyle"
+                style="@style/Widget.WhalePet.Button"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="10dp"
                 android:layout_weight="1"
-                android:insetBottom="0dp"
-                android:insetTop="0dp"
-                android:minHeight="48dp"
-                android:minWidth="0dp"
-                android:text="@string/plugin_import_from_file"
-                android:textSize="14sp" />
+                android:text="@string/plugin_import_from_file" />
         </LinearLayout>
 
         <LinearLayout

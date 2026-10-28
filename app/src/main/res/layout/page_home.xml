@@ -34,6 +34,7 @@
 
         <!-- 立即查余额 -->
         <Button
+            style="@style/Widget.WhalePet.Button"
             android:id="@+id/btn_check_balance"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -53,6 +54,7 @@
 
         <!-- 启停：单按钮、全宽、位于所有按钮最底部 -->
         <Button
+            style="@style/Widget.WhalePet.Button"
             android:id="@+id/btn_toggle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
