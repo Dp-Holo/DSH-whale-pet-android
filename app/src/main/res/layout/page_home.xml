@@ -20,7 +20,7 @@
             android:layout_marginBottom="20dp"
             android:text="@string/main_title"
             android:textColor="@color/ic_launcher_background"
-            android:textSize="18sp"
+            android:textSize="20sp"
             android:textStyle="bold" />
 
         <!-- API Key -->
@@ -34,11 +34,7 @@
 
         <!-- 立即查余额 -->
         <Button
-                android:insetBottom="0dp"
-                android:insetTop="0dp"
-                android:textSize="13sp"
-                android:minHeight="32dp"
-            style="@style/Widget.WhalePet.Button"
+                style="@style/Widget.WhalePet.Button"
             android:id="@+id/btn_check_balance"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -58,11 +54,7 @@
 
         <!-- 启停：单按钮、全宽、位于所有按钮最底部 -->
         <Button
-                android:insetBottom="0dp"
-                android:insetTop="0dp"
-                android:textSize="13sp"
-                android:minHeight="32dp"
-            style="@style/Widget.WhalePet.Button"
+                style="@style/Widget.WhalePet.Button.Primary"
             android:id="@+id/btn_toggle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

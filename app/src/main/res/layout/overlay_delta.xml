@@ -7,4 +7,4 @@
     android:layout_height="wrap_content"
     android:textSize="12sp"
     android:textStyle="bold"
-    android:textColor="#E53935" />
+    android:textColor="@color/delta_loss" />

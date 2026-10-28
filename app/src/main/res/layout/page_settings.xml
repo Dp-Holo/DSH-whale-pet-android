@@ -16,7 +16,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/settings_title"
-            android:textSize="18sp"
+            android:textSize="20sp"
             android:textStyle="bold" />
 
         <TextView
@@ -29,11 +29,7 @@
 
         <!-- 悬浮窗权限（已授予隐藏） -->
         <Button
-                android:insetBottom="0dp"
-                android:insetTop="0dp"
-                android:textSize="13sp"
-                android:minHeight="32dp"
-            style="@style/Widget.WhalePet.Button"
+                style="@style/Widget.WhalePet.Button.Primary"
             android:id="@+id/btn_overlay"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -42,11 +38,7 @@
 
         <!-- 电池优化白名单（已加入隐藏），与上一按钮相邻 -->
         <Button
-                android:insetBottom="0dp"
-                android:insetTop="0dp"
-                android:textSize="13sp"
-                android:minHeight="32dp"
-            style="@style/Widget.WhalePet.Button"
+                style="@style/Widget.WhalePet.Button"
             android:id="@+id/btn_battery"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -55,11 +47,7 @@
 
         <!-- 通知设置 -->
         <Button
-                android:insetBottom="0dp"
-                android:insetTop="0dp"
-                android:textSize="13sp"
-                android:minHeight="32dp"
-            style="@style/Widget.WhalePet.Button"
+                style="@style/Widget.WhalePet.Button"
             android:id="@+id/btn_notif_settings"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -68,11 +56,7 @@
 
         <!-- 关于鲸鱼娘桌宠（技术说明 + GitHub 链接） -->
         <Button
-                android:insetBottom="0dp"
-                android:insetTop="0dp"
-                android:textSize="13sp"
-                android:minHeight="32dp"
-            style="@style/Widget.WhalePet.Button"
+                style="@style/Widget.WhalePet.Button"
             android:id="@+id/btn_about"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

@@ -1,4 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- 语义色：界面只引用这些名字，不再在各布局里硬编码十六进制 -->
     <color name="ic_launcher_background">#3A5FD6</color>
+
+    <!-- 文字层级 -->
+    <color name="text_primary">#1A1C1E</color>
+    <color name="text_secondary">#44474E</color>
+    <color name="text_hint">#8A8F98</color>
+
+    <!-- 余额与金额提示 -->
+    <color name="balance_main">#5B7CE0</color>
+    <color name="balance_shadow">#C8C8C8</color>
+    <color name="delta_loss">#E5484D</color>
+    <color name="delta_gain">#2E9E5B</color>
+
+    <!-- 卡片与分割 -->
+    <color name="surface_card">#FFFFFF</color>
+    <color name="surface_page">#F6F7FB</color>
+    <color name="outline_soft">#E3E6EE</color>
 </resources>

@@ -23,20 +23,14 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="@string/tab_plugins"
-                android:textSize="18sp"
+                android:textSize="20sp"
                 android:textStyle="bold" />
 
             <Button
-                android:insetBottom="0dp"
-                android:insetTop="0dp"
-                android:textSize="13sp"
-                android:minHeight="32dp"
-                android:id="@+id/btn_plugin_sample"
                 style="@style/Widget.WhalePet.Button"
+                android:id="@+id/btn_plugin_sample"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:paddingLeft="12dp"
-                android:paddingRight="12dp"
                 android:text="@string/plugin_install_sample" />
         </LinearLayout>
 
@@ -56,24 +50,16 @@
             android:orientation="horizontal">
 
             <Button
-                android:insetBottom="0dp"
-                android:insetTop="0dp"
-                android:textSize="13sp"
-                android:minHeight="32dp"
+                style="@style/Widget.WhalePet.Button.Primary"
                 android:id="@+id/btn_plugin_install"
-                style="@style/Widget.WhalePet.Button"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="@string/plugin_install" />
 
             <Button
-                android:insetBottom="0dp"
-                android:insetTop="0dp"
-                android:textSize="13sp"
-                android:minHeight="32dp"
-                android:id="@+id/btn_plugin_import"
                 style="@style/Widget.WhalePet.Button"
+                android:id="@+id/btn_plugin_import"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="10dp"

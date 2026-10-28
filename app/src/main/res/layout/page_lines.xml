@@ -23,7 +23,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="@string/lines_title"
-                android:textSize="18sp"
+                android:textSize="20sp"
                 android:textStyle="bold" />
 
             <ImageButton
@@ -53,24 +53,16 @@
             android:orientation="horizontal">
 
             <Button
-                android:insetBottom="0dp"
-                android:insetTop="0dp"
-                android:textSize="13sp"
-                android:minHeight="32dp"
-                android:id="@+id/tab_line_normal"
                 style="@style/Widget.WhalePet.Button"
+                android:id="@+id/tab_line_normal"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="@string/line_type_normal" />
 
             <Button
-                android:insetBottom="0dp"
-                android:insetTop="0dp"
-                android:textSize="13sp"
-                android:minHeight="32dp"
-                android:id="@+id/tab_line_gain"
                 style="@style/Widget.WhalePet.Button"
+                android:id="@+id/tab_line_gain"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
@@ -78,12 +70,8 @@
                 android:text="@string/line_type_gain" />
 
             <Button
-                android:insetBottom="0dp"
-                android:insetTop="0dp"
-                android:textSize="13sp"
-                android:minHeight="32dp"
-                android:id="@+id/tab_line_loss"
                 style="@style/Widget.WhalePet.Button"
+                android:id="@+id/tab_line_loss"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"

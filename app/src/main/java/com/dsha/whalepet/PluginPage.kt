@@ -101,11 +101,9 @@ object PluginPage {
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply { bottomMargin = (8 * dm.density).toInt() }
                 radius = 12 * dm.density
-                cardElevation = 0f
+                cardElevation = 1f
                 setCardBackgroundColor(
-                    com.google.android.material.color.MaterialColors.getColor(
-                        this, com.google.android.material.R.attr.colorSurfaceVariant
-                    )
+                    androidx.core.content.ContextCompat.getColor(activity, R.color.surface_card)
                 )
                 addView(row)
             }
