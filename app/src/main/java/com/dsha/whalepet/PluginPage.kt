@@ -52,7 +52,10 @@ object PluginPage {
         plugins.forEach { plugin ->
             val row = LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL
-                setPadding(0, (10 * dm.density).toInt(), 0, (10 * dm.density).toInt())
+                setPadding(
+                    (12 * dm.density).toInt(), (12 * dm.density).toInt(),
+                    (12 * dm.density).toInt(), (12 * dm.density).toInt()
+                )
             }
             val title = TextView(activity).apply {
                 text = buildString {
@@ -91,7 +94,22 @@ object PluginPage {
                 })
             }
             row.setOnClickListener { showActions(activity, plugin, container) }
-            container.addView(row)
+            // 与台词条目一致：卡片容器 + 12dp 圆角 + surfaceVariant 背景，保证列表观感统一
+            val card = com.google.android.material.card.MaterialCardView(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = (8 * dm.density).toInt() }
+                radius = 12 * dm.density
+                cardElevation = 0f
+                setCardBackgroundColor(
+                    com.google.android.material.color.MaterialColors.getColor(
+                        this, com.google.android.material.R.attr.colorSurfaceVariant
+                    )
+                )
+                addView(row)
+            }
+            container.addView(card)
         }
     }
 

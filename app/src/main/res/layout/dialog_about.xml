@@ -19,7 +19,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textColor="?attr/colorPrimary"
-            android:textSize="20sp"
+            android:textSize="18sp"
             android:textStyle="bold" />
 
         <!-- 一句话来源 -->
@@ -29,7 +29,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             android:lineSpacingExtra="3dp"
-            android:textSize="13sp" />
+            android:textSize="12sp" />
 
         <!-- 小节：隐私 -->
         <TextView
@@ -47,7 +47,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:lineSpacingExtra="4dp"
-            android:textSize="13sp" />
+            android:textSize="12sp" />
 
         <!-- 小节：许可 -->
         <TextView
@@ -65,7 +65,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:lineSpacingExtra="4dp"
-            android:textSize="13sp" />
+            android:textSize="12sp" />
 
         <!-- 小节：仓库（可点击跳转） -->
         <TextView
@@ -84,6 +84,6 @@
             android:layout_marginTop="4dp"
             android:lineSpacingExtra="4dp"
             android:textColor="?attr/colorPrimary"
-            android:textSize="13sp" />
+            android:textSize="12sp" />
     </LinearLayout>
 </ScrollView>
