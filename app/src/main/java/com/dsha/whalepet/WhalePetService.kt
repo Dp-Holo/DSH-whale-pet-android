@@ -501,6 +501,8 @@ class WhalePetService : Service() {
         // 本体在窗口内居中绘制，四周留出点击缩放余量
         val pad = imgPad
         whaleImg.setPadding(pad, pad, pad, pad)
+        // 首帧就按初始朝向绘制，避免启动瞬间由原图方向翻到运动方向
+        whaleImg.scaleX = facing
 
         overlayParams = WindowManager.LayoutParams(
             win,
@@ -572,8 +574,10 @@ class WhalePetService : Service() {
     private var lastTapAt = 0L
     private var singleTapRunnable: Runnable? = null
     private var moved = false
-    // 当前朝向：1=朝右，-1=朝左（点击缩放动画必须保留，不能硬编码覆盖）
-    private var facing = 1f
+    // 当前朝向：1=原图方向，-1=镜像（点击缩放动画必须保留，不能硬编码覆盖）。
+    // 初值与初始运动方向对齐（angle=-0.4 → cos 为正 → 向右 → wantFacing=-1），
+    // 否则启动第一步会触发一次翻转动画（用户反馈"启动时一定翻转一下"）。
+    private var facing = -1f
     // 当前速度（供 clamp 反弹用）
     private var curVx = 0f
     private var curVy = 0f
