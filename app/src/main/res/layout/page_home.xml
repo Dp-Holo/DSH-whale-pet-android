@@ -23,7 +23,8 @@
             android:textSize="20sp"
             android:textStyle="bold" />
 
-        <!-- 鲸鱼娘形象：尺寸与悬浮窗本体一致（96dp），启动时视觉上无缝"接替"，50ms 后本图隐藏 -->
+        <!-- 鲸鱼娘形象：尺寸与悬浮窗本体一致（96dp）、朝向也与桌宠初始朝向一致（镜像），
+             启动时视觉上无缝"接替"，50ms 后本图隐藏 -->
         <ImageView
             android:id="@+id/iv_whale"
             android:layout_width="96dp"
@@ -32,6 +33,7 @@
             android:layout_marginBottom="12dp"
             android:adjustViewBounds="true"
             android:contentDescription="@string/main_title"
+            android:scaleX="-1"
             android:src="@drawable/home_whale" />
 
         <!-- API Key -->
