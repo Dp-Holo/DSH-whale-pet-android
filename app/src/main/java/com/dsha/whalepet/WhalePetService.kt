@@ -192,8 +192,8 @@ class WhalePetService : Service() {
     /** 把窗口挪到启动落点（服务已在运行时用；首次启动在校准后调用）。 */
     private fun applyStartPosition() {
         if (pendingStartX < 0 || pendingStartY < 0) return
-        x = (pendingStartX - windowPx / 2f).coerceIn(boundMinX, boundMaxX)
-        y = (pendingStartY - offsetY - windowPx / 2f).coerceIn(boundMinY, boundMaxY)
+        x = (pendingStartX - windowPx / 2f).coerceIn(boundMinX.toFloat(), boundMaxX.toFloat())
+        y = (pendingStartY - offsetY - windowPx / 2f).coerceIn(boundMinY.toFloat(), boundMaxY.toFloat())
         overlayParams.x = x.roundToInt()
         overlayParams.y = y.roundToInt()
         safeUpdateLayout()
@@ -1012,8 +1012,8 @@ class WhalePetService : Service() {
             // 初始位置：有启动落点就落在主页图片位置，否则右下角（与旧版观感一致）
             val dm = resources.displayMetrics
             if (pendingStartX >= 0 && pendingStartY >= 0) {
-                x = (pendingStartX - windowPx / 2f).coerceIn(boundMinX, boundMaxX)
-                y = (pendingStartY - offsetY - windowPx / 2f).coerceIn(boundMinY, boundMaxY)
+                x = (pendingStartX - windowPx / 2f).coerceIn(boundMinX.toFloat(), boundMaxX.toFloat())
+                y = (pendingStartY - offsetY - windowPx / 2f).coerceIn(boundMinY.toFloat(), boundMaxY.toFloat())
                 pendingStartX = -1
                 pendingStartY = -1
             } else {
