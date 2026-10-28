@@ -8,14 +8,15 @@
     -->
     <style name="Theme.WhalePet" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- 低版本 fallback 色（壁纸取色不可用时使用） -->
-        <item name="colorPrimary">#4A7DFF</item>
+        <item name="colorPrimary">#4D6BFE</item>
         <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorPrimaryContainer">#DCE6FF</item>
-        <item name="colorOnPrimaryContainer">#0F2C6B</item>
+        <item name="colorPrimaryContainer">#DDE3FF</item>
+        <item name="colorOnPrimaryContainer">#10214A</item>
         <item name="colorSecondary">#2E9E5B</item>
         <item name="colorSurface">#FFFFFF</item>
-        <item name="colorSurfaceVariant">#F2F5FA</item>
-        <item name="colorOutline">#E3E6EE</item>
+        <item name="android:windowBackground">@color/surface_page</item>
+        <item name="colorSurfaceVariant">#EDEDED</item>
+        <item name="colorOutline">@color/outline_soft</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
     </style>
 
