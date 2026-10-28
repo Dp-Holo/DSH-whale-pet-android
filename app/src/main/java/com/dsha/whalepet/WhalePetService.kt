@@ -51,6 +51,9 @@ import java.util.Locale
 class WhalePetService : Service() {
 
     companion object {
+        /** 启动时的"落点"：主页鲸鱼娘图片的屏幕中心（由 Activity 传入） */
+        const val EXTRA_START_CENTER_X = "start_center_x"
+        const val EXTRA_START_CENTER_Y = "start_center_y"
         /** 服务是否正在运行（供界面启停按钮显示对应文案）。 */
         @Volatile
         var isRunning: Boolean = false
@@ -101,6 +104,9 @@ class WhalePetService : Service() {
     private var layoutFailLoggedAt = 0L
     /** 布局失败后的游动恢复任务（窗口恢复后自动继续，避免一直静止） */
     private var wanderResumeRunnable: Runnable? = null
+    /** 待应用的启动落点（屏幕坐标，-1 表示不指定） */
+    private var pendingStartX = -1
+    private var pendingStartY = -1
     private var balanceRunnable: Runnable? = null
     // 余额消耗检测（每 3 秒静默查询，结果不显示）
     private var tokenWatchRunnable: Runnable? = null
@@ -169,7 +175,31 @@ class WhalePetService : Service() {
      * 显式声明不粘性：服务异常退出后不由系统自动重启。
      * 这样"权限被撤销 → onCreate 抛异常 → 系统重启"不会再变成崩溃循环。
      */
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_NOT_STICKY
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // 主页点「启动桌宠」时带上图片中心坐标：悬浮窗先落在图上，随后主页图片淡出
+        intent?.let {
+            val cx = it.getIntExtra(EXTRA_START_CENTER_X, -1)
+            val cy = it.getIntExtra(EXTRA_START_CENTER_Y, -1)
+            if (cx >= 0 && cy >= 0) {
+                pendingStartX = cx
+                pendingStartY = cy
+                if (boundsReady) applyStartPosition()
+            }
+        }
+        return START_NOT_STICKY
+    }
+
+    /** 把窗口挪到启动落点（服务已在运行时用；首次启动在校准后调用）。 */
+    private fun applyStartPosition() {
+        if (pendingStartX < 0 || pendingStartY < 0) return
+        x = (pendingStartX - windowPx / 2f).coerceIn(boundMinX, boundMaxX)
+        y = (pendingStartY - offsetY - windowPx / 2f).coerceIn(boundMinY, boundMaxY)
+        overlayParams.x = x.roundToInt()
+        overlayParams.y = y.roundToInt()
+        safeUpdateLayout()
+        pendingStartX = -1
+        pendingStartY = -1
+    }
 
     override fun onDestroy() {
         isRunning = false
@@ -979,10 +1009,17 @@ class WhalePetService : Service() {
             }
             computeSafeBounds()
             boundsReady = boundMaxX > boundMinX && boundMaxY > boundMinY
-            // 初始位置：右下角（与旧版观感一致）
+            // 初始位置：有启动落点就落在主页图片位置，否则右下角（与旧版观感一致）
             val dm = resources.displayMetrics
-            x = (boundMaxX - (24 * dm.density).toInt()).toFloat()
-            y = (boundMaxY - (60 * dm.density).toInt()).toFloat()
+            if (pendingStartX >= 0 && pendingStartY >= 0) {
+                x = (pendingStartX - windowPx / 2f).coerceIn(boundMinX, boundMaxX)
+                y = (pendingStartY - offsetY - windowPx / 2f).coerceIn(boundMinY, boundMaxY)
+                pendingStartX = -1
+                pendingStartY = -1
+            } else {
+                x = (boundMaxX - (24 * dm.density).toInt()).toFloat()
+                y = (boundMaxY - (60 * dm.density).toInt()).toFloat()
+            }
             overlayParams.x = x.roundToInt()
             overlayParams.y = y.roundToInt()
             overlayParams.alpha = 1f

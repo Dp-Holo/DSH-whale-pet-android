@@ -17,11 +17,22 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="20dp"
+            android:layout_marginBottom="12dp"
             android:text="@string/main_title"
             android:textColor="@color/ic_launcher_background"
             android:textSize="20sp"
             android:textStyle="bold" />
+
+        <!-- 鲸鱼娘形象：点击启动桌宠后会先"叠"在她身上，50ms 后本图隐藏 -->
+        <ImageView
+            android:id="@+id/iv_whale"
+            android:layout_width="240dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="12dp"
+            android:adjustViewBounds="true"
+            android:contentDescription="@string/main_title"
+            android:src="@drawable/home_whale" />
 
         <!-- API Key -->
         <EditText
@@ -48,7 +59,7 @@
             android:layout_marginTop="8dp"
             android:gravity="center"
             android:text="@string/balance_hint"
-            android:textColor="#A2B4DD"
+            android:textColor="@color/balance_main"
             android:textSize="16sp"
             android:textStyle="bold" />
 

@@ -13,6 +13,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -48,6 +49,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnBattery: Button
     private lateinit var etApiKey: EditText
     private lateinit var tvBalance: TextView
+    private lateinit var ivWhale: ImageView
 
     /** 底栏分页 */
     private lateinit var tabHome: TextView
@@ -86,6 +88,7 @@ class MainActivity : AppCompatActivity() {
         btnBattery = findViewById(R.id.btn_battery)
         etApiKey = findViewById(R.id.et_api_key)
         tvBalance = findViewById(R.id.tv_balance)
+        ivWhale = findViewById(R.id.iv_whale)
         llLines = findViewById(R.id.ll_lines)
 
         // 回填已保存的 key
@@ -410,6 +413,8 @@ class MainActivity : AppCompatActivity() {
     /** 启停按钮文案随服务运行状态切换。 */
     private fun refreshToggleState() {
         btnToggle.setText(if (WhalePetService.isRunning) R.string.stop_service else R.string.start_service)
+        // 桌宠运行时主页图片让位（启动瞬间已隐藏）；停止后恢复显示
+        ivWhale.visibility = if (WhalePetService.isRunning) View.INVISIBLE else View.VISIBLE
     }
 
     /** 无 Shizuku 或自动加入失败时，跳系统电池优化授权框/列表。 */
@@ -496,11 +501,20 @@ class MainActivity : AppCompatActivity() {
 
     private fun startServiceCompat() {
         val intent = Intent(this, WhalePetService::class.java)
+        // 把主页鲸鱼娘图片的屏幕中心位置传过去：悬浮窗先从"图上"出现，再淡出图片
+        if (ivWhale.width > 0) {
+            val loc = IntArray(2)
+            ivWhale.getLocationOnScreen(loc)
+            intent.putExtra(WhalePetService.EXTRA_START_CENTER_X, loc[0] + ivWhale.width / 2)
+            intent.putExtra(WhalePetService.EXTRA_START_CENTER_Y, loc[1] + ivWhale.height / 2)
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent)
         } else {
             startService(intent)
         }
+        // 0.05 秒后隐藏图片，让悬浮窗的鲸鱼娘"接替"她的位置
+        ivWhale.postDelayed({ ivWhale.visibility = View.INVISIBLE }, 50)
         toast(R.string.start_service)
     }
 
