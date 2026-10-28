@@ -23,10 +23,10 @@
             android:textSize="20sp"
             android:textStyle="bold" />
 
-        <!-- 鲸鱼娘形象：点击启动桌宠后会先"叠"在她身上，50ms 后本图隐藏 -->
+        <!-- 鲸鱼娘形象：尺寸与悬浮窗本体一致（96dp），启动时视觉上无缝"接替"，50ms 后本图隐藏 -->
         <ImageView
             android:id="@+id/iv_whale"
-            android:layout_width="240dp"
+            android:layout_width="96dp"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
             android:layout_marginBottom="12dp"
