@@ -34,6 +34,10 @@
 
         <!-- 立即查余额 -->
         <Button
+                android:insetBottom="0dp"
+                android:insetTop="0dp"
+                android:textSize="13sp"
+                android:minHeight="32dp"
             style="@style/Widget.WhalePet.Button"
             android:id="@+id/btn_check_balance"
             android:layout_width="match_parent"
@@ -54,6 +58,10 @@
 
         <!-- 启停：单按钮、全宽、位于所有按钮最底部 -->
         <Button
+                android:insetBottom="0dp"
+                android:insetTop="0dp"
+                android:textSize="13sp"
+                android:minHeight="32dp"
             style="@style/Widget.WhalePet.Button"
             android:id="@+id/btn_toggle"
             android:layout_width="match_parent"

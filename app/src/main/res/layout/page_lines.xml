@@ -53,6 +53,10 @@
             android:orientation="horizontal">
 
             <Button
+                android:insetBottom="0dp"
+                android:insetTop="0dp"
+                android:textSize="13sp"
+                android:minHeight="32dp"
                 android:id="@+id/tab_line_normal"
                 style="@style/Widget.WhalePet.Button"
                 android:layout_width="0dp"
@@ -61,6 +65,10 @@
                 android:text="@string/line_type_normal" />
 
             <Button
+                android:insetBottom="0dp"
+                android:insetTop="0dp"
+                android:textSize="13sp"
+                android:minHeight="32dp"
                 android:id="@+id/tab_line_gain"
                 style="@style/Widget.WhalePet.Button"
                 android:layout_width="0dp"
@@ -70,6 +78,10 @@
                 android:text="@string/line_type_gain" />
 
             <Button
+                android:insetBottom="0dp"
+                android:insetTop="0dp"
+                android:textSize="13sp"
+                android:minHeight="32dp"
                 android:id="@+id/tab_line_loss"
                 style="@style/Widget.WhalePet.Button"
                 android:layout_width="0dp"
