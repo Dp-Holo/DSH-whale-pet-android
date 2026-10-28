@@ -189,6 +189,16 @@ class WhalePetService : Service() {
         return START_NOT_STICKY
     }
 
+    /** 系统状态栏高度（校准失败时作为窗口原点偏移的近似值）。 */
+    private fun statusBarHeightPx(): Int {
+        val resId = resources.getIdentifier("status_bar_height", "dimen", "android")
+        return if (resId > 0) {
+            runCatching { resources.getDimensionPixelSize(resId) }.getOrDefault(0)
+        } else {
+            0
+        }
+    }
+
     /** 把窗口挪到启动落点（服务已在运行时用；首次启动在校准后调用）。 */
     private fun applyStartPosition() {
         if (pendingStartX < 0 || pendingStartY < 0) return
@@ -994,18 +1004,32 @@ class WhalePetService : Service() {
         }
     }
 
-    /** 读取实测偏移并换算边界，然后恢复正常透明度。 */
-    private fun measureWithProbe(probeX: Int, probeY: Int) {
+    /**
+     * 读取实测偏移并换算边界。
+     *
+     * `updateViewLayout` 有时会"返回成功但窗口并未移动到探针位置"（刚添加的窗口尚未完成
+     * 第一次 layout 时尤甚）。此时测出的偏移会异常大，若直接置 0，会少算约一个状态栏的高度，
+     * 表现为"桌宠启动位置略低"。因此：偏移异常时**重试移动并再测一帧**，最多 2 次；
+     * 仍失败则用系统状态栏高度兜底（窗口原点通常就在状态栏下方）。
+     */
+    private fun measureWithProbe(probeX: Int, probeY: Int, attempt: Int = 0) {
         rootView.postOnAnimation {
             val loc = IntArray(2)
             rootView.getLocationOnScreen(loc)
-            offsetX = loc[0] - probeX
-            offsetY = loc[1] - probeY
-            // 偏移量不应大于窗口尺寸，异常则视为无偏移
+            val dx = loc[0] - probeX
+            val dy = loc[1] - probeY
             val limit = windowPx * 2
-            if (abs(offsetX) > limit || abs(offsetY) > limit) {
-                offsetX = 0
-                offsetY = 0
+            if ((abs(dx) > limit || abs(dy) > limit) && attempt < 2) {
+                // 窗口还没真正移动到位：再试一次
+                moveToProbe(probeX, probeY)
+                measureWithProbe(probeX, probeY, attempt + 1)
+                return@postOnAnimation
+            }
+            val calibrated = abs(dx) <= limit && abs(dy) <= limit
+            offsetX = if (calibrated) dx else 0
+            offsetY = if (calibrated) dy else statusBarHeightPx()
+            if (!calibrated) {
+                dumpDebug("calibrate: offset fallback to statusbar=${offsetY}px")
             }
             computeSafeBounds()
             boundsReady = boundMaxX > boundMinX && boundMaxY > boundMinY
