@@ -68,6 +68,13 @@ class WhalePetService : Service() {
         /** 余额变动气泡时长（2.5 秒）+ 少量余量，用于「先弹提示、后显示余额」的串行安排 */
         private const val TOKEN_BUBBLE_DURATION_MS = 2_600L
 
+        /**
+         * 启动落点的视觉微调（dp）：主页图片的鲸鱼主体与桌宠本体在各自画面中的视觉重心不同，
+         * 即使数学中心一致，看起来也会偏。负值 = 左移。
+         */
+        private const val START_X_ADJUST_DP = -16f
+        private const val START_Y_ADJUST_DP = 0f
+
         /** 金额变化提示颜色：扣款红、增加绿 */
         private const val DELTA_COLOR_LOSS = 0xFFE53935.toInt()
         private const val DELTA_COLOR_GAIN = 0xFF43A047.toInt()
@@ -202,8 +209,10 @@ class WhalePetService : Service() {
     /** 把窗口挪到启动落点（服务已在运行时用；首次启动在校准后调用）。 */
     private fun applyStartPosition() {
         if (pendingStartX < 0 || pendingStartY < 0) return
-        x = (pendingStartX - windowPx / 2f).coerceIn(boundMinX.toFloat(), boundMaxX.toFloat())
-        y = (pendingStartY - offsetY - windowPx / 2f).coerceIn(boundMinY.toFloat(), boundMaxY.toFloat())
+        x = (pendingStartX - windowPx / 2f + START_X_ADJUST_DP * resources.displayMetrics.density)
+                    .coerceIn(boundMinX.toFloat(), boundMaxX.toFloat())
+        y = (pendingStartY - offsetY - windowPx / 2f + START_Y_ADJUST_DP * resources.displayMetrics.density)
+                    .coerceIn(boundMinY.toFloat(), boundMaxY.toFloat())
         overlayParams.x = x.roundToInt()
         overlayParams.y = y.roundToInt()
         safeUpdateLayout()
@@ -1040,8 +1049,10 @@ class WhalePetService : Service() {
             // 初始位置：有启动落点就落在主页图片位置，否则右下角（与旧版观感一致）
             val dm = resources.displayMetrics
             if (pendingStartX >= 0 && pendingStartY >= 0) {
-                x = (pendingStartX - windowPx / 2f).coerceIn(boundMinX.toFloat(), boundMaxX.toFloat())
-                y = (pendingStartY - offsetY - windowPx / 2f).coerceIn(boundMinY.toFloat(), boundMaxY.toFloat())
+                x = (pendingStartX - windowPx / 2f + START_X_ADJUST_DP * resources.displayMetrics.density)
+                    .coerceIn(boundMinX.toFloat(), boundMaxX.toFloat())
+                y = (pendingStartY - offsetY - windowPx / 2f + START_Y_ADJUST_DP * resources.displayMetrics.density)
+                    .coerceIn(boundMinY.toFloat(), boundMaxY.toFloat())
                 dumpDebug(
                     "startPos: want=(${pendingStartX},${pendingStartY}) " +
                         "param=(${x.roundToInt()},${y.roundToInt()}) " +
