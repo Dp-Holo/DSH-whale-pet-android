@@ -268,8 +268,8 @@ class MainActivity : AppCompatActivity() {
         lines.forEachIndexed { index, text ->
             val item = inflater.inflate(R.layout.item_line, llLines, false)
             item.findViewById<TextView>(R.id.line_text).text = text
-            item.findViewById<Button>(R.id.btn_edit_line).setOnClickListener { showLineDialog(index) }
-            item.findViewById<Button>(R.id.btn_del_line).setOnClickListener { confirmDeleteLine(index) }
+            item.findViewById<View>(R.id.btn_edit_line).setOnClickListener { showLineDialog(index) }
+            item.findViewById<View>(R.id.btn_del_line).setOnClickListener { confirmDeleteLine(index) }
             llLines.addView(item)
         }
     }
