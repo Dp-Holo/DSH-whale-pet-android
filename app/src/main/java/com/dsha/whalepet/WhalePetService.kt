@@ -62,8 +62,8 @@ class WhalePetService : Service() {
         /** 检测到余额变化后的冷却：1 分钟内不再探测 */
         private const val TOKEN_COOLDOWN_AFTER_CHANGE_MS = 60_000L
 
-        /** 气泡显示时长（2.2 秒）+ 少量余量，用于「先弹提示、后显示余额」的串行安排 */
-        private const val TOKEN_BUBBLE_DURATION_MS = 2_300L
+        /** 余额变动气泡时长（2.5 秒）+ 少量余量，用于「先弹提示、后显示余额」的串行安排 */
+        private const val TOKEN_BUBBLE_DURATION_MS = 2_600L
 
         /** 金额变化提示颜色：扣款红、增加绿 */
         private const val DELTA_COLOR_LOSS = 0xFFE53935.toInt()
@@ -641,7 +641,7 @@ class WhalePetService : Service() {
     }
 
     /** 显示/更新独立气泡窗（定位在鲸鱼头顶上方），返回前清掉旧定时器。 */
-    private fun showBubbleWindow(text: String, clearBadge: Boolean) {
+    private fun showBubbleWindow(text: String, clearBadge: Boolean, durationMs: Long = 2_200L) {
         bubbleTv.text = text
         bubbleTv.visibility = View.VISIBLE
         if (clearBadge) badgeBox.visibility = View.INVISIBLE
@@ -661,7 +661,7 @@ class WhalePetService : Service() {
         }
         bubbleTimer?.let(handler::removeCallbacks)
         bubbleTimer = Runnable { hideBubbleWindow() }
-        handler.postDelayed(bubbleTimer!!, 2200)
+        handler.postDelayed(bubbleTimer!!, durationMs)
     }
 
     /** 把气泡窗放到鲸鱼头顶正上方（水平居中）。 */
@@ -701,7 +701,7 @@ class WhalePetService : Service() {
             deltaTimer?.let(handler::removeCallbacks)
             // 与台词一致：显示约 2.2 秒后直接消失（不做淡出动画）
             deltaTimer = Runnable { hideDeltaWindow() }
-            handler.postDelayed(deltaTimer!!, 2_200L)
+            handler.postDelayed(deltaTimer!!, 2_500L)
         } catch (_: Throwable) {
         }
     }
@@ -1140,10 +1140,11 @@ class WhalePetService : Service() {
 
     // ── 余额：5 分钟轮询 + 头顶上浮渐隐 0.8s ──────────────────
     private fun scheduleBalance() {
+        // 只在启动（及亮屏恢复）时显示一次余额；不再每 5 分钟重复弹窗（用户要求）。
+        // 手动查余额仍可双击鲸鱼娘。
         balanceRunnable = object : Runnable {
             override fun run() {
                 showBalanceAsync()
-                handler.postDelayed(this, 5 * 60 * 1000L)
             }
         }
         // 熄屏状态下启动服务时不发请求，等 ACTION_SCREEN_ON 再恢复
@@ -1174,11 +1175,8 @@ class WhalePetService : Service() {
     // ── 余额消耗检测：每 3 秒静默查询（结果不显示）───────────
 
     /**
-     * 每 3 秒静默查一次余额：只用于比较，**不显示**查询结果。
-     * 当余额相比上一次**减少**时（币种需一致），自动冒一句
-     * "正在偷吃用户token..."，显示路径与单击台词完全相同（头顶气泡 2.2s）。
-     * 该提示有 10 秒节流：10 秒内最多显示一次。
-     * 余额本身的展示仍由 5 分钟轮询负责。
+     * 余额变化探测：无变化每 5 秒一次；有变化时冒台词 + 显示红/绿金额，随后冷却 1 分钟。
+     * 余额本身不再周期显示（用户要求取消每 5 分钟弹窗），双击可手动查。
      * 熄屏期间暂停发起请求（见 pauseBalanceWatch），亮屏恢复。
      */
     private fun scheduleTokenWatch() {
@@ -1261,7 +1259,7 @@ class WhalePetService : Service() {
                 // 余额减少：从「消费」类台词随机说一句（默认含「正在吃掉用户token...」）
                 val line = WhaleLines.load(this, WhaleLines.Type.LOSS).randomOrNull()
                     ?: getString(R.string.token_nibble_line)
-                showBubbleWindow(line, clearBadge = true)
+                showBubbleWindow(line, clearBadge = true, durationMs = 2_500L)
                 handler.postDelayed({ showBadge(balanceText) }, TOKEN_BUBBLE_DURATION_MS)
                 // 鲸鱼下方：红色 + 负号显示本次扣款
                 showDelta(
@@ -1280,7 +1278,7 @@ class WhalePetService : Service() {
                 // 余额增加：从「充值」类台词随机说一句，并显示新余额与增加金额
                 val line = WhaleLines.load(this, WhaleLines.Type.GAIN).randomOrNull()
                     ?: getString(R.string.token_nibble_line)
-                showBubbleWindow(line, clearBadge = true)
+                showBubbleWindow(line, clearBadge = true, durationMs = 2_500L)
                 handler.postDelayed({ showBadge(balanceText) }, TOKEN_BUBBLE_DURATION_MS)
                 showDelta(
                     getString(
