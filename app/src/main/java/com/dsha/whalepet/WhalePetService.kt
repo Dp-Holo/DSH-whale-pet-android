@@ -1042,6 +1042,11 @@ class WhalePetService : Service() {
             if (pendingStartX >= 0 && pendingStartY >= 0) {
                 x = (pendingStartX - windowPx / 2f).coerceIn(boundMinX.toFloat(), boundMaxX.toFloat())
                 y = (pendingStartY - offsetY - windowPx / 2f).coerceIn(boundMinY.toFloat(), boundMaxY.toFloat())
+                dumpDebug(
+                    "startPos: want=(${pendingStartX},${pendingStartY}) " +
+                        "param=(${x.roundToInt()},${y.roundToInt()}) " +
+                        "actualCenter=(${x.roundToInt() + windowPx / 2},${y.roundToInt() + offsetY + windowPx / 2})"
+                )
                 pendingStartX = -1
                 pendingStartY = -1
             } else {
