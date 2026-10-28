@@ -12,6 +12,7 @@ import androidx.appcompat.app.AlertDialog
 import com.dsha.whalepet.plugin.Plugin
 import com.dsha.whalepet.plugin.PluginCaps
 import com.dsha.whalepet.plugin.PluginManager
+import com.dsha.whalepet.plugin.PluginUi
 
 /**
  * 插件页（独立 tab，位于主页左边）。
@@ -80,6 +81,15 @@ object PluginPage {
             }
             row.addView(title)
             row.addView(capsText)
+            // 外部脚本的绑定状态：不显示的话，用户不知道 scriptFile 插件还差一步
+            PluginUi.scriptFileSummary(activity, plugin)?.let { summary ->
+                row.addView(TextView(activity).apply {
+                    text = summary
+                    textSize = 11f
+                    setTextColor(0xFF888888.toInt())
+                    setPadding(0, (2 * dm.density).toInt(), 0, 0)
+                })
+            }
             row.setOnClickListener { showActions(activity, plugin, container) }
             container.addView(row)
         }
@@ -87,27 +97,38 @@ object PluginPage {
 
     /** 单个插件的操作菜单。 */
     private fun showActions(activity: Activity, plugin: Plugin, container: LinearLayout) {
-        val actions = listOf(
-            activity.getString(if (plugin.enabled) R.string.plugin_disable else R.string.plugin_enable),
-            activity.getString(R.string.plugin_authorize),
-            activity.getString(R.string.plugin_revoke),
-            activity.getString(R.string.confirm_delete)
-        ).toTypedArray()
+        // 用 (标签, 动作) 列表而不是按下标 switch：外部脚本那一项是**条件出现**的，
+        // 用下标容易在增减项时错位（点"删除"却执行了别的操作）。
+        val actions = mutableListOf<Pair<String, () -> Unit>>()
+        actions.add(
+            activity.getString(
+                if (plugin.enabled) R.string.plugin_disable else R.string.plugin_enable
+            ) to {
+                PluginManager.setEnabled(activity, plugin.id, !plugin.enabled)
+                render(activity, container)
+            }
+        )
+        actions.add(activity.getString(R.string.plugin_authorize) to {
+            authorize(activity, plugin, container)
+        })
+        actions.add(activity.getString(R.string.plugin_revoke) to {
+            PluginManager.revokeAll(activity, plugin.id)
+            render(activity, container)
+        })
+        // 只在"涉及外部脚本"时出现：声明了 scriptFile，或已经绑过文件
+        if (plugin.scriptFile != null || PluginManager.scriptUriOf(activity, plugin.id) != null) {
+            actions.add(activity.getString(R.string.plugin_script_pick) to {
+                PluginUi.pickScriptFile(activity, plugin) { render(activity, container) }
+            })
+        }
+        actions.add(activity.getString(R.string.confirm_delete) to {
+            confirmDelete(activity, plugin, container)
+        })
+
         AlertDialog.Builder(activity)
             .setTitle(plugin.name)
-            .setItems(actions) { _, which ->
-                when (which) {
-                    0 -> {
-                        PluginManager.setEnabled(activity, plugin.id, !plugin.enabled)
-                        render(activity, container)
-                    }
-                    1 -> authorize(activity, plugin, container)
-                    2 -> {
-                        PluginManager.revokeAll(activity, plugin.id)
-                        render(activity, container)
-                    }
-                    3 -> confirmDelete(activity, plugin, container)
-                }
+            .setItems(actions.map { it.first }.toTypedArray()) { _, which ->
+                actions.getOrNull(which)?.second?.invoke()
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
@@ -185,11 +206,31 @@ object PluginPage {
     }
 
     fun installSample(activity: Activity, container: LinearLayout) {
-        installJson(activity, SAMPLE_PLUGIN_JSON, container)
+        installJson(activity, SAMPLE_PLUGIN_JSON, container, "内置示例")
     }
 
-    private fun installJson(activity: Activity, json: String, container: LinearLayout) {
-        val p = PluginManager.install(activity, json)
+    /**
+     * 从系统文件选择器导入插件。
+     *
+     * SAF、读取与安装都在插件宿主里（`PluginUi.installFromFile`），这里只负责
+     * 刷新列表与接着走授权 —— 与粘贴安装完全同一条流程。
+     */
+    fun importFromFile(activity: Activity, container: LinearLayout) {
+        PluginUi.installFromFile(activity) { p ->
+            if (p != null) {
+                render(activity, container)
+                authorize(activity, p, container)
+            }
+        }
+    }
+
+    private fun installJson(
+        activity: Activity,
+        json: String,
+        container: LinearLayout,
+        source: String = "粘贴"
+    ) {
+        val p = PluginManager.install(activity, json, source)
         if (p == null) {
             Toast.makeText(activity, R.string.plugin_install_failed, Toast.LENGTH_LONG).show()
             return

@@ -73,17 +73,7 @@ object PluginUi {
                     caps.joinToString("、") { PluginCaps.label(it) }
                 }
                 // 外部脚本插件额外显示绑定情况：未绑定要显式提示，否则用户不知道少做了什么
-                val declared = p.scriptFile
-                val scriptText = if (declared == null) {
-                    null
-                } else {
-                    val bound = PluginManager.scriptFileNameOf(activity, p.id)
-                    if (bound != null) {
-                        activity.getString(R.string.plugin_script_file_bound, bound)
-                    } else {
-                        activity.getString(R.string.plugin_script_file_unbound, declared)
-                    }
-                }
+                val scriptText = scriptFileSummary(activity, p)
                 if (scriptText == null) {
                     "${p.name}（$state）\n$capsText"
                 } else {
@@ -202,9 +192,13 @@ object PluginUi {
     /**
      * 让用户选外部脚本文件（`.js`）。
      *
+     * **对外公开**：插件管理搬到独立页（`PluginPage`，App 侧）后，那一页也要能绑定脚本文件，
+     * 否则 `scriptFile` 插件装上去就永远绑不到文件、等于装了不能用。
+     * SAF 与读取逻辑留在这里，页面侧只调这一个方法。
+     *
      * @param then 选完（或取消）后要接着做的事，安装后的"先选文件再授权"用它
      */
-    private fun pickScriptFile(activity: Activity, p: Plugin, then: (() -> Unit)? = null) {
+    fun pickScriptFile(activity: Activity, p: Plugin, then: (() -> Unit)? = null) {
         pickFile(activity, SCRIPT_PICK_KEY) { uri: Uri? ->
             if (uri == null) {
                 then?.invoke()
@@ -253,6 +247,77 @@ object PluginUi {
                     }
                 }.start()
             }
+        }
+    }
+
+    // ── 给 App 侧插件页（PluginPage）用的最小入口 ──────────────
+    //
+    // 插件管理搬到独立页之后，原先挂在本对话框里的"从文件导入"与"绑定脚本文件"
+    // 都失去了入口：`scriptFile` 插件在那一页装上去永远绑不到文件，装了不能用。
+    // 这里只暴露入口，SAF/读取/安装逻辑仍留在插件宿主内，页面侧一行调用即可。
+
+    /**
+     * 插件行上"外部脚本"的摘要文案；不涉及外部脚本时返回 null。
+     *
+     * 两处界面（旧对话框 / 新插件页）共用同一份文案，避免说法不一致。
+     */
+    fun scriptFileSummary(activity: Activity, plugin: Plugin): String? {
+        val declared = plugin.scriptFile ?: return null
+        val bound = PluginManager.scriptFileNameOf(activity, plugin.id)
+        return if (bound != null) {
+            activity.getString(R.string.plugin_script_file_bound, bound)
+        } else {
+            activity.getString(R.string.plugin_script_file_unbound, declared)
+        }
+    }
+
+    /**
+     * 从系统文件选择器导入插件。
+     *
+     * 与粘贴走**同一套安装流程**；若插件声明了 `scriptFile`，导入后紧接着要求绑定脚本文件
+     * ——否则它装是装上了，但没有任何可执行内容。
+     *
+     * @param onDone 回调带回安装好的插件；取消/读取失败/解析失败为 null
+     */
+    fun installFromFile(activity: Activity, onDone: (Plugin?) -> Unit) {
+        pickFile(activity, IMPORT_PICK_KEY) { uri: Uri? ->
+            if (uri == null) {
+                onDone(null)
+                return@pickFile
+            }
+            // 读文件放后台：SAF 的 provider 可能是网盘，主线程读会 ANR
+            Thread {
+                val (text, error) = PluginManager.readPickedText(activity, uri)
+                activity.runOnUiThread {
+                    if (text == null) {
+                        Toast.makeText(
+                            activity,
+                            activity.getString(
+                                R.string.plugin_import_read_failed, error ?: "未知原因"
+                            ),
+                            Toast.LENGTH_LONG
+                        ).show()
+                        onDone(null)
+                        return@runOnUiThread
+                    }
+                    val p = PluginManager.install(activity, text, "文件导入")
+                    if (p == null) {
+                        Toast.makeText(activity, R.string.plugin_install_failed, Toast.LENGTH_LONG).show()
+                        onDone(null)
+                        return@runOnUiThread
+                    }
+                    Toast.makeText(
+                        activity,
+                        activity.getString(R.string.plugin_installed, p.name),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    if (p.scriptFile != null) {
+                        pickScriptFile(activity, p) { onDone(p) }
+                    } else {
+                        onDone(p)
+                    }
+                }
+            }.start()
         }
     }
 

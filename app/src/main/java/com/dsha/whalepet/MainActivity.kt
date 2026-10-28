@@ -204,6 +204,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btn_plugin_sample).setOnClickListener {
             PluginPage.installSample(this, llPlugins)
         }
+        findViewById<Button>(R.id.btn_plugin_import).setOnClickListener {
+            PluginPage.importFromFile(this, llPlugins)
+        }
         PluginPage.render(this, llPlugins)
 
         // Shizuku：注册 binder 就绪/授权结果监听。binder 就绪后自动请求授权，

@@ -53,6 +53,21 @@
                 android:paddingRight="10dp"
                 android:text="@string/plugin_install"
                 android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/btn_plugin_import"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:insetBottom="0dp"
+                android:insetTop="0dp"
+                android:minHeight="32dp"
+                android:minWidth="0dp"
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp"
+                android:text="@string/plugin_import_from_file"
+                android:textSize="12sp" />
         </LinearLayout>
 
         <TextView
