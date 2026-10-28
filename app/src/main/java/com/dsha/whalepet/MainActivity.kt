@@ -180,7 +180,7 @@ class MainActivity : AppCompatActivity() {
         tabLineGain.setOnClickListener { switchLineType(WhaleLines.Type.GAIN) }
         tabLineLoss.setOnClickListener { switchLineType(WhaleLines.Type.LOSS) }
         switchLineType(WhaleLines.Type.NORMAL)
-        findViewById<Button>(R.id.btn_add_line).setOnClickListener { showLineDialog(null) }
+        findViewById<View>(R.id.btn_add_line).setOnClickListener { showLineDialog(null) }
 
         // ── 底栏分页：主页 / 台词管理 / 设置 ──────────────────
         tabHome = findViewById(R.id.tab_home)

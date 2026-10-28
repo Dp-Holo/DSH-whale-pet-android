@@ -32,30 +32,30 @@
             <!-- 编辑：无背景圈、点按区域 44dp、图标 26dp（放大且与删除视觉一致） -->
             <ImageButton
                 android:id="@+id/btn_edit_line"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
                 android:background="@null"
                 android:contentDescription="@string/edit_line_hint"
-                android:padding="9dp"
+                android:padding="7dp"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_edit_line" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                android:layout_marginEnd="10dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
                 android:alpha="0.45"
                 android:text="/"
                 android:textSize="14sp" />
 
             <ImageButton
                 android:id="@+id/btn_del_line"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
                 android:background="@null"
                 android:contentDescription="@string/delete_line_title"
-                android:padding="9dp"
+                android:padding="7dp"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_delete_line" />
         </LinearLayout>
