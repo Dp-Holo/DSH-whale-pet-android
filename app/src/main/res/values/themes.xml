@@ -25,11 +25,15 @@
       间距与尺寸由样式负责，布局里只留 layout_* 布局属性。
     -->
     <style name="Widget.WhalePet.Button" parent="Widget.Material3.Button.OutlinedButton">
-        <item name="android:minHeight">48dp</item>
+        <!-- 40dp / 13sp：比常见的 48dp 标准按钮矮一档，一屏能放下更多操作，
+             也不至于小到不好点（Material 建议最小触控区 48dp，这里靠横向留白补足） -->
+        <item name="android:minHeight">40dp</item>
         <item name="android:minWidth">0dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
-        <item name="android:textSize">14sp</item>
+        <item name="android:paddingLeft">16dp</item>
+        <item name="android:paddingRight">16dp</item>
+        <item name="android:textSize">13sp</item>
     </style>
 
 </resources>
