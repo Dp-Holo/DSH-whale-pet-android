@@ -72,7 +72,7 @@ class WhalePetService : Service() {
          * 启动落点的视觉微调（dp）：主页图片的鲸鱼主体与桌宠本体在各自画面中的视觉重心不同，
          * 即使数学中心一致，看起来也会偏。负值 = 左移。
          */
-        private const val START_X_ADJUST_DP = -16f
+        private const val START_X_ADJUST_DP = -28f
         private const val START_Y_ADJUST_DP = 0f
 
         /** 金额变化提示颜色：扣款红、增加绿 */
