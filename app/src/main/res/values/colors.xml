@@ -18,4 +18,6 @@
     <color name="surface_card">#FFFFFF</color>
     <color name="surface_page">#F6F7FB</color>
     <color name="outline_soft">#E3E6EE</color>
+    <!-- 次要按钮的淡填充：告诉用户"这里能点" -->
+    <color name="surface_chip">#EEF1F6</color>
 </resources>
