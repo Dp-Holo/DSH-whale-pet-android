@@ -55,6 +55,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
     private lateinit var fabMenu: com.google.android.material.floatingactionbutton.FloatingActionButton
     private var currentPage = 1
+    private var menuIconOpen = false
     private lateinit var llPlugins: LinearLayout
     /** 自动授权尝试的节流时间戳（返回界面时最多每 5 分钟试一次） */
     private var lastAutoGrantAttemptAt = 0L
@@ -199,7 +200,16 @@ class MainActivity : AppCompatActivity() {
             override fun onDrawerSlide(drawerView: android.view.View, slideOffset: Float) {
                 // 抽屉滑出时按钮同步切换：三横线蓝底 → 叉号浅底
                 val open = slideOffset > 0.5f
-                fabMenu.setImageResource(if (open) R.drawable.ic_menu_close else R.drawable.ic_menu_lines)
+                if (open != menuIconOpen) {
+                    menuIconOpen = open
+                    // 图标旋转 90° 后替换：三横线 ↔ 叉，视觉上有"翻面"过渡
+                    fabMenu.animate().rotationBy(90f).setDuration(160).withEndAction {
+                        fabMenu.setImageResource(
+                            if (open) R.drawable.ic_menu_close else R.drawable.ic_menu_lines
+                        )
+                        fabMenu.rotation = 0f
+                    }.start()
+                }
                 fabMenu.backgroundTintList = android.content.res.ColorStateList.valueOf(
                     androidx.core.content.ContextCompat.getColor(
                         this@MainActivity, if (open) R.color.f2f4f5 else R.color.brand_primary

@@ -49,18 +49,19 @@
         <LinearLayout
             android:id="@+id/menu_panel"
             android:layout_width="232dp"
-            android:layout_height="match_parent"
-            android:layout_gravity="end"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
             android:background="@color/menu_bg"
             android:orientation="vertical"
-            android:paddingBottom="96dp"
-            android:paddingTop="16dp">
+            android:paddingBottom="16dp"
+            android:paddingTop="12dp">
 
             <!-- 设置：单独留在顶部 -->
             <FrameLayout
                 android:id="@+id/menu_settings"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
+                android:layout_marginBottom="8dp"
                 android:background="@android:color/transparent">
 
                 <View
@@ -93,6 +94,7 @@
                 android:id="@+id/menu_plugins"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
+                android:layout_marginBottom="8dp"
                 android:background="@android:color/transparent">
 
                 <View
@@ -119,6 +121,7 @@
                 android:id="@+id/menu_lines"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
+                android:layout_marginBottom="8dp"
                 android:background="@android:color/transparent">
 
                 <View
@@ -145,6 +148,7 @@
                 android:id="@+id/menu_home"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
+                android:layout_marginBottom="8dp"
                 android:background="@android:color/transparent">
 
                 <View
@@ -174,13 +178,16 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_marginBottom="20dp"
-        android:layout_marginEnd="20dp"
+        android:layout_marginBottom="16dp"
+        android:layout_marginEnd="16dp"
         android:contentDescription="@string/tab_home"
         android:src="@drawable/ic_menu_lines"
+        android:stateListAnimator="@null"
         app:backgroundTint="@color/brand_primary"
         app:borderWidth="0dp"
-        app:elevation="6dp"
-        app:fabSize="normal"
+        app:elevation="4dp"
+        app:fabSize="mini"
+        app:rippleColor="@android:color/transparent"
+        app:shapeAppearanceOverlay="@style/WhalePetFabCircle"
         app:tint="@color/f2f4f5" />
 </FrameLayout>

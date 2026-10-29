@@ -29,6 +29,12 @@
       统一到这里以后，新页面只写 style="@style/Widget.WhalePet.Button"，
       间距与尺寸由样式负责，布局里只留 layout_* 布局属性。
     -->
+    <!-- FAB 正圆（Material 3 默认是圆角方形） -->
+    <style name="WhalePetFabCircle" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
     <style name="Widget.WhalePet.Button" parent="Widget.Material3.Button.TonalButton">
         <!-- 次要操作：淡灰填充 + 圆角。文字按钮太"隐形"，用户看不出哪些地方能点，
              因此改为有底色的 chip 形态；主次仍靠颜色区分。布局里不要再手工调尺寸。 -->
