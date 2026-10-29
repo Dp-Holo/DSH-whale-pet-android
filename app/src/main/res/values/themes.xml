@@ -61,6 +61,8 @@
         <item name="android:textSize">13sp</item>
         <item name="backgroundTint">@color/brand_primary</item>
         <item name="android:textColor">@color/f2f4f5</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textStyle">bold</item>
     </style>
 
 </resources>
