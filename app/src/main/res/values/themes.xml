@@ -46,12 +46,12 @@
         <item name="android:paddingRight">12dp</item>
         <item name="android:textSize">13sp</item>
         <item name="backgroundTint">@color/surface_chip</item>
-        <item name="android:textColor">@color/text_secondary</item>
+        <item name="android:textColor">@color/brand_primary</item>
         <item name="cornerRadius">8dp</item>
     </style>
 
     <style name="Widget.WhalePet.Button.Primary" parent="Widget.Material3.Button.TonalButton">
-        <!-- 主操作：柔和填充，区别于次要的文字按钮 -->
+        <!-- 主操作：蓝底（与 FAB 同色）+ 浅色文字（与 FAB 图标同色） -->
         <item name="android:minHeight">36dp</item>
         <item name="android:minWidth">0dp</item>
         <item name="android:insetTop">0dp</item>
@@ -59,6 +59,8 @@
         <item name="android:paddingLeft">16dp</item>
         <item name="android:paddingRight">16dp</item>
         <item name="android:textSize">13sp</item>
+        <item name="backgroundTint">@color/brand_primary</item>
+        <item name="android:textColor">@color/f2f4f5</item>
     </style>
 
 </resources>

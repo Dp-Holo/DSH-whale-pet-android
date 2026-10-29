@@ -8,9 +8,9 @@
     <color name="brand_primary">#4D6BFE</color>
 
     <!-- 文字层级（中性灰阶） -->
-    <color name="text_primary">#1B1B1B</color>
-    <color name="text_secondary">#4A4A4A</color>
-    <color name="text_hint">#8C8C8C</color>
+    <color name="text_primary">#4D6BFE</color>
+    <color name="text_secondary">#4D6BFE</color>
+    <color name="text_hint">#4D6BFE</color>
 
     <!-- 余额与金额提示 -->
     <color name="balance_main">#5B6BFE</color>
@@ -25,7 +25,7 @@
     <color name="outline_soft">#DEDEDE</color>
 
     <!-- 菜单（抽屉）：背景浅灰、选中项背景浅蓝（按用户提供图片取色 #EFF3FF） -->
-    <color name="menu_bg">#F2F4F5</color>
+    <color name="menu_bg">#F7FAFF</color>
     <color name="menu_selected">#EFF3FF</color>
     <color name="f2f4f5">#F2F4F5</color>
 </resources>
