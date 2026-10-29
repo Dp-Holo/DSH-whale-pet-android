@@ -21,4 +21,9 @@
     <color name="surface_card">#FFFFFF</color>
     <color name="surface_chip">#E8E8E8</color>
     <color name="outline_soft">#DEDEDE</color>
+
+    <!-- 菜单（抽屉）：背景浅灰、选中项背景浅蓝（按用户提供图片取色 #EFF3FF） -->
+    <color name="menu_bg">#F2F4F5</color>
+    <color name="menu_selected">#EFF3FF</color>
+    <color name="f2f4f5">#F2F4F5</color>
 </resources>

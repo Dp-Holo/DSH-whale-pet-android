@@ -52,11 +52,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var ivWhale: ImageView
 
     /** 底栏分页 */
-    private lateinit var tabHome: TextView
-    private lateinit var tabLines: TextView
-    private lateinit var tabPlugins: TextView
+    private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
+    private lateinit var fabMenu: com.google.android.material.floatingactionbutton.FloatingActionButton
+    private var currentPage = 1
     private lateinit var llPlugins: LinearLayout
-    private lateinit var tabSettings: TextView
     /** 自动授权尝试的节流时间戳（返回界面时最多每 5 分钟试一次） */
     private var lastAutoGrantAttemptAt = 0L
 
@@ -186,14 +185,37 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.btn_add_line).setOnClickListener { showLineDialog(null) }
 
         // ── 底栏分页：主页 / 台词管理 / 设置 ──────────────────
-        tabHome = findViewById(R.id.tab_home)
-        tabLines = findViewById(R.id.tab_lines)
-        tabPlugins = findViewById(R.id.tab_plugins)
-        tabSettings = findViewById(R.id.tab_settings)
-        tabPlugins.setOnClickListener { showPage(0) }
-        tabHome.setOnClickListener { showPage(1) }
-        tabLines.setOnClickListener { showPage(2) }
-        tabSettings.setOnClickListener { showPage(3) }
+        // 右下角菜单 + 右侧抽屉（替代原底部 tab）
+        drawerLayout = findViewById(R.id.drawer_layout)
+        fabMenu = findViewById(R.id.fab_menu)
+        fabMenu.setOnClickListener {
+            if (drawerLayout.isDrawerOpen(android.view.Gravity.END)) {
+                drawerLayout.closeDrawer(android.view.Gravity.END)
+            } else {
+                drawerLayout.openDrawer(android.view.Gravity.END)
+            }
+        }
+        drawerLayout.addDrawerListener(object : androidx.drawerlayout.widget.DrawerLayout.SimpleDrawerListener() {
+            override fun onDrawerSlide(drawerView: android.view.View, slideOffset: Float) {
+                // 抽屉滑出时按钮同步切换：三横线蓝底 → 叉号浅底
+                val open = slideOffset > 0.5f
+                fabMenu.setImageResource(if (open) R.drawable.ic_menu_close else R.drawable.ic_menu_lines)
+                fabMenu.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                    androidx.core.content.ContextCompat.getColor(
+                        this@MainActivity, if (open) R.color.f2f4f5 else R.color.colorPrimary
+                    )
+                )
+                fabMenu.imageTintList = android.content.res.ColorStateList.valueOf(
+                    androidx.core.content.ContextCompat.getColor(
+                        this@MainActivity, if (open) R.color.colorPrimary else R.color.f2f4f5
+                    )
+                )
+            }
+        })
+        findViewById<View>(R.id.menu_plugins).setOnClickListener { selectPage(0) }
+        findViewById<View>(R.id.menu_home).setOnClickListener { selectPage(1) }
+        findViewById<View>(R.id.menu_lines).setOnClickListener { selectPage(2) }
+        findViewById<View>(R.id.menu_settings).setOnClickListener { selectPage(3) }
         showPage(1)
 
         // 关于鲸鱼娘桌宠（技术说明 + GitHub 链接）
@@ -225,21 +247,35 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.page_home).visibility = if (index == 1) View.VISIBLE else View.GONE
         findViewById<View>(R.id.page_lines).visibility = if (index == 2) View.VISIBLE else View.GONE
         findViewById<View>(R.id.page_settings).visibility = if (index == 3) View.VISIBLE else View.GONE
-        styleTab(tabPlugins, index == 0)
-        styleTab(tabHome, index == 1)
-        styleTab(tabLines, index == 2)
-        styleTab(tabSettings, index == 3)
+        currentPage = index
+        updateMenuSelection(index)
     }
 
-    private fun styleTab(tab: TextView, active: Boolean) {
-        val attr = if (active) {
-            com.google.android.material.R.attr.colorPrimary
-        } else {
-            com.google.android.material.R.attr.colorOnSurfaceVariant
-        }
-        tab.setTextColor(MaterialColors.getColor(tab, attr))
-        tab.alpha = if (active) 1f else 0.7f
+    /** 点击菜单项：切页并收起抽屉。 */
+    private fun selectPage(index: Int) {
+        showPage(index)
+        drawerLayout.closeDrawer(android.view.Gravity.END)
     }
+
+    /** 菜单选中态：左侧蓝色细竖条 + 该选项条浅蓝背景。 */
+    private fun updateMenuSelection(index: Int) {
+        val items = intArrayOf(
+            R.id.menu_plugins, R.id.menu_home, R.id.menu_lines, R.id.menu_settings
+        )
+        val indicators = intArrayOf(
+            R.id.ind_plugins, R.id.ind_home, R.id.ind_lines, R.id.ind_settings
+        )
+        val bgSelected = androidx.core.content.ContextCompat.getColor(this, R.color.menu_selected)
+        items.forEachIndexed { i, id ->
+            val active = i == index
+            findViewById<View>(id).setBackgroundColor(
+                if (active) bgSelected else android.graphics.Color.TRANSPARENT
+            )
+            findViewById<View>(indicators[i]).visibility =
+                if (active) View.VISIBLE else View.INVISIBLE
+        }
+    }
+
 
     // ── 台词管理实现 ─────────────────────────────────────────
 
