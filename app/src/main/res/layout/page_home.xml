@@ -13,6 +13,18 @@
         android:orientation="vertical"
         android:padding="24dp">
 
+        <!-- 标题：主页保留顶部居中（主页 UI 后续单独设计） -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="12dp"
+            android:fontFamily="sans-serif-medium"
+            android:text="@string/main_title"
+            android:textColor="@color/brand_primary"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
         <!-- 鲸鱼娘形象：尺寸与悬浮窗本体一致（96dp）、朝向也与桌宠初始朝向一致（镜像），
              启动时视觉上无缝"接替"，50ms 后本图隐藏 -->
         <ImageView
