@@ -210,6 +210,8 @@ class MainActivity : AppCompatActivity() {
                         this@MainActivity, if (open) R.color.brand_primary else R.color.f2f4f5
                     )
                 )
+                // 打开时去掉阴影：与抽屉同色、无分层，视觉上"融进"菜单栏
+                fabMenu.elevation = if (open) 0f else resources.displayMetrics.density * 6f
             }
         })
         findViewById<View>(R.id.menu_plugins).setOnClickListener { selectPage(0) }

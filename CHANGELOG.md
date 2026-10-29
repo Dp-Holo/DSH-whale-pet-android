@@ -14,6 +14,13 @@
 避免特殊预览包污染正常的 1.1.x 序列。
 
 
+## 1.1.77
+
+抽屉菜单细节调整：
+- 菜单展开时 FAB 与菜单栏**融为一体**：底色同为 #F2F4F5，并去掉 FAB 阴影（展开时 elevation=0）
+- 菜单项整体上提：底部留白 16dp → 96dp，最后一项不再与 FAB 同高
+- 菜单项字体改为黑体（sans-serif-medium）
+
 ## 1.1.76
 
 修复 1.1.75 的编译错误：布局里引用了 `@color/colorPrimary`，而 `colorPrimary` 是主题属性、不是颜色资源。现新增 `brand_primary`（#4D6BFE）颜色资源，主题 `colorPrimary` 指向它，布局与代码统一引用该资源。
