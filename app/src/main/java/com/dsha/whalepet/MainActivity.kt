@@ -189,6 +189,11 @@ class MainActivity : AppCompatActivity() {
         // 右下角菜单 + 右侧抽屉（替代原底部 tab）
         drawerLayout = findViewById(R.id.drawer_layout)
         fabMenu = findViewById(R.id.fab_menu)
+        // 抽屉宽度 = 屏幕一半（DrawerLayout 不支持百分比宽度，用代码设定）
+        findViewById<View>(R.id.menu_panel).layoutParams =
+            findViewById<View>(R.id.menu_panel).layoutParams.apply {
+                width = resources.displayMetrics.widthPixels / 2
+            }
         fabMenu.setOnClickListener {
             if (drawerLayout.isDrawerOpen(android.view.Gravity.END)) {
                 drawerLayout.closeDrawer(android.view.Gravity.END)
@@ -202,12 +207,14 @@ class MainActivity : AppCompatActivity() {
                 val open = slideOffset > 0.5f
                 if (open != menuIconOpen) {
                     menuIconOpen = open
-                    // 图标旋转 90° 后替换：三横线 ↔ 叉，视觉上有"翻面"过渡
-                    fabMenu.animate().rotationBy(90f).setDuration(160).withEndAction {
+                    // 旋转到 45° 时替换图标（三横线 ↔ 叉），再转到 90°，视觉上是"翻面"
+                    fabMenu.animate().rotation(45f).setDuration(80).withEndAction {
                         fabMenu.setImageResource(
                             if (open) R.drawable.ic_menu_close else R.drawable.ic_menu_lines
                         )
-                        fabMenu.rotation = 0f
+                        fabMenu.animate().rotation(90f).setDuration(80).withEndAction {
+                            fabMenu.rotation = 0f
+                        }.start()
                     }.start()
                 }
                 fabMenu.backgroundTintList = android.content.res.ColorStateList.valueOf(
