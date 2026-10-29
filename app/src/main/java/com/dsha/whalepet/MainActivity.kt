@@ -207,15 +207,7 @@ class MainActivity : AppCompatActivity() {
                 val open = slideOffset > 0.5f
                 if (open != menuIconOpen) {
                     menuIconOpen = open
-                    // 旋转到 45° 时替换图标（三横线 ↔ 叉），再转到 90°，视觉上是"翻面"
-                    fabMenu.animate().rotation(45f).setDuration(80).withEndAction {
-                        fabMenu.setImageResource(
-                            if (open) R.drawable.ic_menu_close else R.drawable.ic_menu_lines
-                        )
-                        fabMenu.animate().rotation(90f).setDuration(80).withEndAction {
-                            fabMenu.rotation = 0f
-                        }.start()
-                    }.start()
+                    animateMenuIcon(open)
                 }
                 fabMenu.backgroundTintList = android.content.res.ColorStateList.valueOf(
                     androidx.core.content.ContextCompat.getColor(
@@ -268,6 +260,37 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.page_settings).visibility = if (index == 3) View.VISIBLE else View.GONE
         currentPage = index
         updateMenuSelection(index)
+    }
+
+    /**
+     * 菜单图标过渡：三横线（0°）↔ 叉号（90°）。
+     *
+     * 用单个 ValueAnimator 连续旋转，角度越过 45° 时替换图标：
+     * - 打开：0° → 90°（✓ 叉号旋转 90° 仍是叉号）
+     * - 关闭：90° → 0°（结束时正好是横着的三横线，不再"竖着然后突然复位"）
+     * 插值器用减速曲线，比两段 animator 串起来更顺滑。
+     */
+    private fun animateMenuIcon(open: Boolean) {
+        val start = if (open) 0f else 90f
+        val end = if (open) 90f else 0f
+        val swapped = booleanArrayOf(false)
+        fabMenu.rotation = start
+        android.animation.ValueAnimator.ofFloat(start, end).apply {
+            duration = 220
+            interpolator = android.view.animation.DecelerateInterpolator()
+            addUpdateListener { anim ->
+                val v = anim.animatedValue as Float
+                fabMenu.rotation = v
+                val passedMid = if (open) v >= 45f else v <= 45f
+                if (!swapped[0] && passedMid) {
+                    swapped[0] = true
+                    fabMenu.setImageResource(
+                        if (open) R.drawable.ic_menu_close else R.drawable.ic_menu_lines
+                    )
+                }
+            }
+            start()
+        }
     }
 
     /** 点击菜单项：切页并收起抽屉。 */
