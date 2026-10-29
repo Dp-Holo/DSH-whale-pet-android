@@ -53,7 +53,7 @@
             android:layout_gravity="end"
             android:background="@color/menu_bg"
             android:orientation="vertical"
-            android:paddingBottom="16dp"
+            android:paddingBottom="96dp"
             android:paddingTop="12dp">
 
             <!-- 设置：单独留在顶部 -->
