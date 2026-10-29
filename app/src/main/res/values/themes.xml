@@ -8,7 +8,7 @@
     -->
     <style name="Theme.WhalePet" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- 低版本 fallback 色（壁纸取色不可用时使用） -->
-        <item name="colorPrimary">#4D6BFE</item>
+        <item name="colorPrimary">@color/brand_primary</item>
         <item name="colorOnPrimary">#FFFFFF</item>
         <item name="colorPrimaryContainer">#DDE3FF</item>
         <item name="colorOnPrimaryContainer">#10214A</item>

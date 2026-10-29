@@ -4,6 +4,8 @@
          灰阶一律用中性灰（R=G=B），避免与蓝色主色相邻时被感知成"灰粉"。 -->
 
     <color name="ic_launcher_background">#3A5FD6</color>
+    <!-- 主品牌色（主题 colorPrimary 也指向它，布局/代码统一引用这个资源） -->
+    <color name="brand_primary">#4D6BFE</color>
 
     <!-- 文字层级（中性灰阶） -->
     <color name="text_primary">#1B1B1B</color>

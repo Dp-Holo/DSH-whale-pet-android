@@ -202,12 +202,12 @@ class MainActivity : AppCompatActivity() {
                 fabMenu.setImageResource(if (open) R.drawable.ic_menu_close else R.drawable.ic_menu_lines)
                 fabMenu.backgroundTintList = android.content.res.ColorStateList.valueOf(
                     androidx.core.content.ContextCompat.getColor(
-                        this@MainActivity, if (open) R.color.f2f4f5 else R.color.colorPrimary
+                        this@MainActivity, if (open) R.color.f2f4f5 else R.color.brand_primary
                     )
                 )
                 fabMenu.imageTintList = android.content.res.ColorStateList.valueOf(
                     androidx.core.content.ContextCompat.getColor(
-                        this@MainActivity, if (open) R.color.colorPrimary else R.color.f2f4f5
+                        this@MainActivity, if (open) R.color.brand_primary else R.color.f2f4f5
                     )
                 )
             }
