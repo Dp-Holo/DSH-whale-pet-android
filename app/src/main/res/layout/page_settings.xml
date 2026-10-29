@@ -1,6 +1,8 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- 第三页：设置（授权类按钮 / 通知设置 / 关于）。
-     授权按钮在已授予时会由代码隐藏。 -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -10,7 +12,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:padding="24dp"
+            android:paddingBottom="88dp">
 
         <TextView
             android:layout_width="match_parent"
@@ -57,15 +60,20 @@
             android:text="@string/about_entry" />
 
         <!-- 标题：左下角 -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="start"
-            android:layout_marginTop="24dp"
-            android:fontFamily="sans-serif-medium"
-            android:text="@string/settings_title"
-            android:textColor="@color/text_primary"
-            android:textSize="20sp"
-            android:textStyle="bold" />
     </LinearLayout>
-</ScrollView>
+    </ScrollView>
+
+    <!-- 标题：固定左下角（不随内容滚动） -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginBottom="28dp"
+        android:layout_marginStart="24dp"
+        android:fontFamily="sans-serif-medium"
+        android:text="@string/settings_title"
+        android:textColor="@color/text_primary"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+</FrameLayout>
+
