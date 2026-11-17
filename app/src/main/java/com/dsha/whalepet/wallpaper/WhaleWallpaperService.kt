@@ -148,9 +148,10 @@ class WhaleWallpaperService : WallpaperService() {
             // 预留：后续可用于"翻页视差"，MVP 不实现，避免与 launcher 的缩放动画打架
         }
 
-        override fun onTouchEvent(event: MotionEvent): Boolean {
+        override fun onTouchEvent(event: MotionEvent) {
+            // WallpaperService.Engine.onTouchEvent 的返回值是 void（不是 Boolean），
+            // 手势判定交给 GestureDetector；这里不能返回 Boolean，否则编译不过。
             gestureDetector.onTouchEvent(event)
-            return true
         }
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
