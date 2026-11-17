@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 动态壁纸元数据：description 会显示在系统壁纸选择器里，thumbnail 用应用图标占位 -->
+<wallpaper xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/wallpaper_description"
+    android:thumbnail="@mipmap/ic_launcher" />

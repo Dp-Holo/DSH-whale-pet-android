@@ -47,6 +47,19 @@
                 android:value="floating_mascot_overlay" />
         </service>
 
+        <!-- 动态壁纸服务：由系统绑定，必须声明 BIND_WALLPAPER 权限与 wallpaper 元数据 -->
+        <service
+            android:name=".wallpaper.WhaleWallpaperService"
+            android:exported="true"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/whale_wallpaper" />
+        </service>
+
         <!-- Shizuku Provider：允许通过 Shizuku 免 root 授权（必须 exported=true，Shizuku 服务需跨进程访问） -->
         <provider
             android:name="rikka.shizuku.ShizukuProvider"

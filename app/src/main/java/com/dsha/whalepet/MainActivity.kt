@@ -2,6 +2,8 @@ package com.dsha.whalepet
 
 import android.Manifest
 import android.content.Context
+import android.app.WallpaperManager
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -129,6 +131,11 @@ class MainActivity : AppCompatActivity() {
         // 通知设置：跳系统通知页，用户可彻底关闭常驻通知（服务不受影响）
         findViewById<Button>(R.id.btn_notif_settings).setOnClickListener {
             openNotificationSettings()
+        }
+
+        // 动态壁纸入口（实验）：直接拉起系统 live wallpaper 预览页，由用户确认应用
+        findViewById<Button>(R.id.btn_wallpaper).setOnClickListener {
+            openWallpaperPicker()
         }
 
         // 启停合并为一个按钮：未运行则启动（含权限检查），运行中则停止
@@ -513,6 +520,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** 跳系统通知设置页：用户可关闭常驻通知（前台服务仍会继续运行）。 */
+    /** 打开系统动态壁纸选择器；部分 ROM 没有 ACTION_CHANGE_LIVE_WALLPAPER，退回总选择器 */
+    private fun openWallpaperPicker() {
+        val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
+            putExtra(
+                WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+                ComponentName(this@MainActivity, com.dsha.whalepet.wallpaper.WhaleWallpaperService::class.java)
+            )
+        }
+        val ok = runCatching { startActivity(intent) }.isSuccess ||
+            runCatching { startActivity(Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)) }.isSuccess
+        if (!ok) {
+            android.widget.Toast.makeText(this, R.string.wallpaper_picker_failed, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun openNotificationSettings() {
         try {
             startActivity(
