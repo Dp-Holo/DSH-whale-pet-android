@@ -140,7 +140,7 @@ class MainActivity : AppCompatActivity() {
 
         // 启停合并为一个按钮：未运行则启动（含权限检查），运行中则停止
         btnToggle.setOnClickListener {
-            if (WhalePetService.isRunning) {
+            if (WhalePetService.status.running) {
                 stopService(Intent(this, WhalePetService::class.java))
                 // 服务销毁是异步的，稍后刷新按钮文案
                 btnToggle.postDelayed({ refreshToggleState() }, 400)
@@ -497,9 +497,9 @@ class MainActivity : AppCompatActivity() {
 
     /** 启停按钮文案随服务运行状态切换。 */
     private fun refreshToggleState() {
-        btnToggle.setText(if (WhalePetService.isRunning) R.string.stop_service else R.string.start_service)
+        btnToggle.setText(if (WhalePetService.status.running) R.string.stop_service else R.string.start_service)
         // 桌宠运行时主页图片让位（启动瞬间已隐藏）；停止后恢复显示
-        ivWhale.visibility = if (WhalePetService.isRunning) View.INVISIBLE else View.VISIBLE
+        ivWhale.visibility = if (WhalePetService.status.running) View.INVISIBLE else View.VISIBLE
     }
 
     /** 无 Shizuku 或自动加入失败时，跳系统电池优化授权框/列表。 */

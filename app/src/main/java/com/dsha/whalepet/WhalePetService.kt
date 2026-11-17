@@ -58,6 +58,13 @@ class WhalePetService : Service() {
         @Volatile
         var isRunning: Boolean = false
 
+        /**
+         * 运行状态快照：**可查询**，UI 不需要依赖广播顺序。
+         * 由服务在每次状态迁移后更新；未启动时为默认值。
+         */
+        @Volatile
+        var status: PetStatus = PetStatus()
+
         /** 余额静默检测间隔：3 秒（熄屏期间整体暂停，亮屏恢复） */
         /** 余额变化探测间隔：无变化时每 5 秒一次 */
         private const val TOKEN_WATCH_INTERVAL_MS = 5_000L
@@ -114,6 +121,12 @@ class WhalePetService : Service() {
     /** 待应用的启动落点（屏幕坐标，-1 表示不指定） */
     private var pendingStartX = -1
     private var pendingStartY = -1
+
+    /** 显式生命周期：服务自己持有，外部事件只做"请求"。 */
+    private val lifecycle = PetLifecycle()
+    /** 插件事件投递计数（App 侧可观测：丢了/没丢至少能看出来）。 */
+    private val eventCounts = java.util.concurrent.ConcurrentHashMap<String, Int>()
+    private var lastEventAt = 0L
     private var balanceRunnable: Runnable? = null
     // 余额消耗检测（每 3 秒静默查询，结果不显示）
     private var tokenWatchRunnable: Runnable? = null
@@ -165,6 +178,8 @@ class WhalePetService : Service() {
             stopSelf()
             return
         }
+        lifecycle.start("onCreate")
+        updateStatus()
         isRunning = true
         wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         startForegroundCompat()
@@ -176,6 +191,9 @@ class WhalePetService : Service() {
         scheduleBatteryWatch()
         // 插件宿主启动：App 只交出基础能力，授权/确认/审计由宿主侧负责
         PluginEntry.onServiceStart(this, pluginBridge)
+        // 悬浮窗与帧循环就绪后才算 RUNNING；事件只做"请求"，这里由服务自己确认
+        lifecycle.ready("overlayReady")
+        updateStatus()
     }
 
     /**
@@ -221,6 +239,7 @@ class WhalePetService : Service() {
     }
 
     override fun onDestroy() {
+        lifecycle.stop("onDestroy")
         isRunning = false
         stopWander()
         PluginEntry.onServiceStop()
@@ -242,6 +261,8 @@ class WhalePetService : Service() {
         }
         hideBubbleWindow()
         hideDeltaWindow()
+        lifecycle.stopped("destroyed")
+        updateStatus()
         super.onDestroy()
     }
 
@@ -369,7 +390,7 @@ class WhalePetService : Service() {
             batteryLow = pct in 0..20 && !plugged
             // 插件事件：刚进入低电状态时触发一次
             if (batteryLow && !wasBatteryLow) {
-                PluginEntry.onEvent(this@WhalePetService, "batteryLow", "{\"level\":$pct}")
+                emitPluginEvent("batteryLow", "{\"level\":$pct}")
             }
             wasBatteryLow = batteryLow
         }
@@ -380,14 +401,25 @@ class WhalePetService : Service() {
             when (intent?.action) {
                 // 息屏时停止游动省电，亮屏恢复
                 Intent.ACTION_SCREEN_OFF -> {
-                    stopWander()
-                    pauseBalanceWatch()
-                    PluginEntry.onEvent(this@WhalePetService, "screenOff")
+                    // 事件只做"请求"：状态机接受才暂停，拒绝则记录（不静默）
+                    if (lifecycle.screenOff("screenOff")) {
+                        stopWander()
+                        pauseBalanceWatch()
+                        emitPluginEvent("screenOff")
+                    } else {
+                        dumpDebug("lifecycle: reject screenOff, state=${lifecycle.state}")
+                    }
+                    updateStatus()
                 }
                 Intent.ACTION_SCREEN_ON -> {
-                    startWander()
-                    resumeBalanceWatch()
-                    PluginEntry.onEvent(this@WhalePetService, "screenOn")
+                    if (lifecycle.screenOn("screenOn")) {
+                        startWander()
+                        resumeBalanceWatch()
+                        emitPluginEvent("screenOn")
+                    } else {
+                        dumpDebug("lifecycle: reject screenOn, state=${lifecycle.state}")
+                    }
+                    updateStatus()
                 }
             }
         }
@@ -660,14 +692,14 @@ class WhalePetService : Service() {
             // 双击：查余额
             singleTapRunnable?.let(handler::removeCallbacks)
             lastTapAt = 0
-            PluginEntry.onEvent(this@WhalePetService, "doubleTap")
+            emitPluginEvent("doubleTap")
             showBalanceAsync()
         } else {
             lastTapAt = now
             singleTapRunnable?.let(handler::removeCallbacks)
             singleTapRunnable = Runnable {
                 sayLine()
-                PluginEntry.onEvent(this@WhalePetService, "tap")
+                emitPluginEvent("tap")
             }
             handler.postDelayed(singleTapRunnable!!, 300)
         }
@@ -807,6 +839,7 @@ class WhalePetService : Service() {
         if (wanderRunning) return
         wanderResumeRunnable?.let(handler::removeCallbacks)
         wanderRunning = true
+        updateStatus()
         lastFrameNanos = 0L
         val cb = object : Choreographer.FrameCallback {
             override fun doFrame(frameTimeNanos: Long) {
@@ -831,6 +864,7 @@ class WhalePetService : Service() {
     /** 暂停游动（息屏 / 服务销毁），避免无谓的动画与重绘。 */
     private fun stopWander() {
         wanderRunning = false
+        updateStatus()
         frameCallback?.let { Choreographer.getInstance().removeFrameCallback(it) }
         frameCallback = null
     }
@@ -902,6 +936,12 @@ class WhalePetService : Service() {
         if (debugTickMs >= 30_000f) {
             debugTickMs = 0f
             dumpDebug("tick")
+            // 事件投递可观测：发过多少、最后一条是什么时候
+            if (eventCounts.isNotEmpty()) {
+                val summary = eventCounts.entries.joinToString(",") { "${it.key}=${it.value}" }
+                dumpDebug("events total=${eventCounts.values.sum()} [$summary] lastAt=$lastEventAt")
+            }
+            dumpDebug("lifecycle state=${lifecycle.state} last=${lifecycle.lastTransition} reject=${lifecycle.lastRejected}")
         }
         // 朝向：滞回阈值提高（0.2 → 0.35 倍速）+ 动画过渡，
         // 杜绝速度在阈值附近抖动时朝向反复翻转造成的闪烁
@@ -1205,6 +1245,34 @@ class WhalePetService : Service() {
     private val DEBUG_FILE_NAME = "whale-debug.txt"
 
     /** 记录一行运行时状态到 Download/whale-debug.txt。 */
+    /**
+     * 插件事件统一出口：**先计数再投递**。
+     *
+     * 为什么要计数：借鉴「人工桌面」的反面教训——它的 V8 事件在未就绪/重载窗口
+     * 静默丢弃，用户只看到"没反应"，日志里没有任何痕迹。我们至少让"发过多少、
+     * 最后什么时候发的"可观测。
+     *
+     * 注意：插件是**增强**不是前提——事件发不出去也不影响本体（说话/余额/游动）
+     * 这些内置行为，因此这里不抛异常、不阻塞。
+     */
+    private fun emitPluginEvent(name: String, payload: String = "{}") {
+        eventCounts[name] = (eventCounts[name] ?: 0) + 1
+        lastEventAt = System.currentTimeMillis()
+        PluginEntry.onEvent(this, name, payload)
+    }
+
+    /** 把生命周期/运行时状态同步到可查询的快照。 */
+    private fun updateStatus() {
+        status = PetStatus(
+            state = lifecycle.state,
+            wanderRunning = wanderRunning,
+            boundsReady = boundsReady,
+            lastTransition = lifecycle.lastTransition,
+            lastRejected = lifecycle.lastRejected
+        )
+        isRunning = lifecycle.isAlive
+    }
+
     private fun dumpDebug(tag: String) {
         try {
             val loc = IntArray(2)
@@ -1371,8 +1439,8 @@ class WhalePetService : Service() {
                     DELTA_COLOR_LOSS
                 )
                 // 插件事件：余额减少
-                PluginEntry.onEvent(
-                    this@WhalePetService, "balanceDecreased",
+                emitPluginEvent(
+                    "balanceDecreased",
                     "{\"value\":${amount.value},\"prev\":${prev ?: 0.0}}"
                 )
             } else {
