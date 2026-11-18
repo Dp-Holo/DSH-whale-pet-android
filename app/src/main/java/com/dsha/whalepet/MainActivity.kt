@@ -135,6 +135,10 @@ class MainActivity : AppCompatActivity() {
 
         // 动态壁纸入口（实验）：直接拉起系统 live wallpaper 预览页，由用户确认应用
         findViewById<Button>(R.id.btn_wallpaper).setOnClickListener {
+            // 先给一个即时反馈：部分 ROM 的壁纸选择器启动很慢或静默失败，
+            // 没有 toast 时用户会以为"点了没反应"
+            android.util.Log.i("WhalePet", "wallpaper button clicked")
+            Toast.makeText(this, R.string.wallpaper_opening, Toast.LENGTH_SHORT).show()
             openWallpaperPicker()
         }
 
@@ -520,19 +524,34 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** 跳系统通知设置页：用户可关闭常驻通知（前台服务仍会继续运行）。 */
-    /** 打开系统动态壁纸选择器；部分 ROM 没有 ACTION_CHANGE_LIVE_WALLPAPER，退回总选择器 */
+    /**
+     * 打开系统动态壁纸选择器。
+     *
+     * 三级兜底（不同 ROM 支持度不一样，MIUI 上第一级可能"启动成功但没有界面"）：
+     *  1) ACTION_CHANGE_LIVE_WALLPAPER + 目标组件（能直接进我们的预览）
+     *  2) ACTION_LIVE_WALLPAPER_CHOOSER（动态壁纸总列表）
+     *  3) ACTION_SET_WALLPAPER（系统壁纸设置，用户可手动进"动态壁纸"）
+     * 每一步都打日志：出问题时 logcat 里能直接看到是哪一级、解析到哪个 Activity。
+     */
     private fun openWallpaperPicker() {
-        val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
-            putExtra(
-                WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
-                ComponentName(this@MainActivity, com.dsha.whalepet.wallpaper.WhaleWallpaperService::class.java)
-            )
+        val target = ComponentName(this, com.dsha.whalepet.wallpaper.WhaleWallpaperService::class.java)
+        val candidates = listOf(
+            Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).putExtra(
+                WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, target
+            ),
+            Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER),
+            Intent(Intent.ACTION_SET_WALLPAPER)
+        )
+        for ((index, intent) in candidates.withIndex()) {
+            val resolved = runCatching { intent.resolveActivity(packageManager) }.getOrNull()
+            android.util.Log.i("WhalePet", "wallpaper picker #${index + 1} action=${intent.action} resolved=$resolved")
+            if (resolved == null) continue
+            val launched = runCatching { startActivity(intent) }.isSuccess
+            android.util.Log.i("WhalePet", "wallpaper picker #${index + 1} launched=$launched")
+            if (launched) return
         }
-        val ok = runCatching { startActivity(intent) }.isSuccess ||
-            runCatching { startActivity(Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)) }.isSuccess
-        if (!ok) {
-            android.widget.Toast.makeText(this, R.string.wallpaper_picker_failed, android.widget.Toast.LENGTH_SHORT).show()
-        }
+        android.util.Log.w("WhalePet", "wallpaper picker: no candidate launched")
+        Toast.makeText(this, R.string.wallpaper_picker_failed, Toast.LENGTH_LONG).show()
     }
 
     private fun openNotificationSettings() {

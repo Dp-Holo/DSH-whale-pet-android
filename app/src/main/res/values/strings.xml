@@ -124,4 +124,5 @@
     <string name="wallpaper_description">鲸鱼娘在桌面背景里游动</string>
     <string name="wallpaper_default_line">今天也要好好摸鱼呀～</string>
     <string name="wallpaper_picker_failed">没有找到可用的壁纸选择器</string>
+    <string name="wallpaper_opening">正在打开壁纸选择器…</string>
 </resources>

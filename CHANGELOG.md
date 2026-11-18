@@ -14,6 +14,14 @@
 避免特殊预览包污染正常的 1.1.x 序列。
 
 
+## 1.1.89
+
+壁纸入口诊断与加固（针对"点设为动态壁纸没反应"）：
+
+- 点击按钮立即弹 toast「正在打开壁纸选择器…」并写 `WhalePet` 日志，确认点击确实到达
+- 三级兜底：`CHANGE_LIVE_WALLPAPER` → `LIVE_WALLPAPER_CHOOSER` → `ACTION_SET_WALLPAPER`
+- 每一级记录 `resolveActivity` 与 `startActivity` 结果，便于从 logcat 定位是"无处理者"还是"启动了但无界面"
+
 ## 1.1.88
 
 壁纸方向：视频壁纸 + 音频律动 + 摇一摇（ROLE 对齐的第一阶段）。
