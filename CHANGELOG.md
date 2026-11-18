@@ -14,6 +14,19 @@
 避免特殊预览包污染正常的 1.1.x 序列。
 
 
+## 1.1.88
+
+壁纸方向：视频壁纸 + 音频律动 + 摇一摇（ROLE 对齐的第一阶段）。
+
+- 新增 `VideoPetRenderer`：MediaPlayer → SurfaceTexture → GL 合成，支持缩放/旋转（音频脉动、摇一摇晃动）
+- 新增 `AudioEnvelope`：预计算音频 RMS 包络，按播放位置采样，**不申请 RECORD_AUDIO**；视频静音播放
+- 新增 `ShakeDetector`：加速度计合加速度偏差判定，700ms 冷却，仅可见时注册
+- 新增 `VideoPetState`（纯 Kotlin，含单测）：音频脉动、摇一摇衰减、点击弹跳
+- `WhaleWallpaperService` 改为"视频优先 + Canvas 兜底"，保留可见性停帧/恢复
+- 测试素材：`assets/wallpaper/test_idle.mp4` + `test_idle_env.json`（占位，正式素材替换同名文件即可）
+- 文档：`docs/WALLPAPER_VIDEO.md`（架构、包络生成、参数、限制、验收）
+- 未新增任何 Android 权限
+
 ## 1.1.87
 
 修复 1.1.86 的编译错误（壁纸方向的代码）：`WallpaperService.Engine.onTouchEvent` 的返回值是 void，不是 Boolean，原先写成 `: Boolean` 导致 debug/release 两个变体都编译失败。改为无返回值后通过。
