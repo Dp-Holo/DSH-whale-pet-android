@@ -34,7 +34,8 @@ import kotlin.math.sin
 class VideoPetRenderer(
     private val context: Context,
     private val holder: SurfaceHolder,
-    private val assetPath: String
+    private val assetPath: String,
+    private val log: (String) -> Unit = {}
 ) : PetRenderer {
 
     private val tag = "WhaleVideo"
@@ -77,6 +78,24 @@ class VideoPetRenderer(
 
     /** 初始化是否成功；失败时由 Engine 回退到静态 Canvas 渲染 */
     val isUsable: Boolean get() = !failed
+
+    /** 解码器是否已就绪（已 prepare 且未失败） */
+    val isPrepared: Boolean get() = prepared && !failed
+
+    /** 壁纸可见性变化时调用：不可见暂停解码，避免后台白耗电/占着硬解码器 */
+    fun setActive(active: Boolean) {
+        val p = player ?: return
+        if (!prepared) return
+        runCatching {
+            if (active) {
+                if (!p.isPlaying) p.start()
+                log("player resume")
+            } else {
+                if (p.isPlaying) p.pause()
+                log("player pause")
+            }
+        }
+    }
 
     override fun attach(width: Int, height: Int) {
         surfaceWidth = width.coerceAtLeast(1)
@@ -309,10 +328,12 @@ class VideoPetRenderer(
                     1f
                 }
                 prepared = true
+                log("player prepared w=${mp.videoWidth} h=${mp.videoHeight}")
                 runCatching { mp.start() }
             }
             p.setOnErrorListener { _, what, extra ->
                 Log.w(tag, "player error what=$what extra=$extra")
+                log("player error what=$what extra=$extra")
                 failed = true
                 true
             }
@@ -320,6 +341,7 @@ class VideoPetRenderer(
             player = p
         } catch (t: Throwable) {
             Log.w(tag, "startPlayer failed", t)
+            log("startPlayer failed: ${t.javaClass.simpleName}: ${t.message}")
             runCatching { p.release() }
             failed = true
         }

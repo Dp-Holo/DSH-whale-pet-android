@@ -14,6 +14,14 @@
 避免特殊预览包污染正常的 1.1.x 序列。
 
 
+## 1.1.93
+
+壁纸运行时可观测 + 不可见暂停解码：
+
+- 新增 `WallpaperRuntimeLog`：可见性、解码位置、音频脉动、摇一摇、播放器事件写入 `Android/data/com.dsha.whalepet/files/wallpaper_runtime.txt`（2 秒一行，128KB 轮转）
+- `VideoPetRenderer.setActive()`：不可见时 `MediaPlayer.pause()`，恢复时 `start()`，避免后台占着硬解码器
+- 诊断值可用于验收：播放位置是否推进、脉动是否随节拍起伏、摇一摇是否触发
+
 ## 1.1.92
 
 壁纸入口继续诊断：

@@ -12,6 +12,7 @@ import com.dsha.whalepet.wallpaper.video.AudioEnvelope
 import com.dsha.whalepet.wallpaper.video.ShakeDetector
 import com.dsha.whalepet.wallpaper.video.VideoPetRenderer
 import com.dsha.whalepet.wallpaper.video.VideoPetState
+import com.dsha.whalepet.wallpaper.video.WallpaperRuntimeLog
 
 /**
  * 鲸鱼娘动态壁纸服务。
@@ -59,6 +60,8 @@ class WhaleWallpaperService : WallpaperService() {
         private var running = false
         private var lastFrameNanos = 0L
         private var consecutiveErrors = 0
+        /** 诊断：累计到 2 秒写一行运行状态 */
+        private var diagAccumMs = 0f
 
         private val choreographer: Choreographer = Choreographer.getInstance()
 
@@ -74,9 +77,20 @@ class WhaleWallpaperService : WallpaperService() {
                     val video = videoRenderer
                     if (video != null) {
                         // 音频包络按播放位置采样，和视频天然同步
-                        videoState.setAudioLevel(envelope?.sample(video.currentPositionMs()) ?: 0f)
+                        val pos = video.currentPositionMs()
+                        videoState.setAudioLevel(envelope?.sample(pos) ?: 0f)
                         videoState.step(dtScale)
                         video.render(videoState.frame(surfaceWidth, surfaceHeight), now)
+                        diagAccumMs += dtScale * 16.67f
+                        if (diagAccumMs >= 2000f) {
+                            diagAccumMs = 0f
+                            WallpaperRuntimeLog.append(
+                                this@WhaleWallpaperService,
+                                "tick visible=$visible prepared=${video.isPrepared} pos=$pos " +
+                                    "pulse=${"%.2f".format(videoState.currentPulse)} scale=${"%.3f".format(videoState.scale)} " +
+                                    "rot=${"%.3f".format(videoState.rotation)}"
+                            )
+                        }
                     } else {
                         val s = spriteState ?: return
                         val r = canvasRenderer ?: return
@@ -109,6 +123,7 @@ class WhaleWallpaperService : WallpaperService() {
                     // 视频模式下先只做弹跳反馈；台词气泡需要 GL 文字纹理，放到 M3.5
                     videoRenderer?.let { videoState.onTap() } ?: spriteState?.say(line, System.currentTimeMillis())
                     Log.i(tag, "tap: $line")
+                    WallpaperRuntimeLog.append(this@WhaleWallpaperService, "tap: $line")
                     return true
                 }
 
@@ -141,11 +156,15 @@ class WhaleWallpaperService : WallpaperService() {
             // 视频优先；失败（素材缺失/EGL 初始化失败）则回退静态 Canvas
             val video = videoRenderer ?: VideoPetRenderer(
                 this@WhaleWallpaperService.applicationContext, holder, videoAsset
-            ).also { videoRenderer = it }
+            ) { line ->
+                WallpaperRuntimeLog.append(this@WhaleWallpaperService, "video: $line")
+            }.also { videoRenderer = it }
             video.attach(surfaceWidth, surfaceHeight)
             if (!video.isUsable) {
                 video.detach()
                 videoRenderer = null
+            } else {
+                video.setActive(visible)
             }
 
             if (videoRenderer == null) {
@@ -175,6 +194,8 @@ class WhaleWallpaperService : WallpaperService() {
             super.onVisibilityChanged(visible)
             this.visible = visible
             Log.i(tag, "visible=$visible")
+            WallpaperRuntimeLog.append(this@WhaleWallpaperService, "visible=$visible")
+            videoRenderer?.setActive(visible)
             if (visible) {
                 startLoop()
                 // 传感器只在可见时注册，避免常驻耗电
@@ -203,6 +224,7 @@ class WhaleWallpaperService : WallpaperService() {
             // 顺序很重要：先停循环再释放，避免回调里拿到已释放的 GL/Surface
             stopLoop()
             shakeDetector?.stop()
+            WallpaperRuntimeLog.append(this@WhaleWallpaperService, "surfaceDestroyed")
             videoRenderer?.detach()
             videoRenderer = null
             canvasRenderer?.detach()
@@ -225,6 +247,7 @@ class WhaleWallpaperService : WallpaperService() {
 
         private fun onShakeDetected() {
             Log.i(tag, "shake")
+            WallpaperRuntimeLog.append(this@WhaleWallpaperService, "shake")
             videoRenderer?.let { videoState.onShake() } ?: spriteState?.jump()
         }
 

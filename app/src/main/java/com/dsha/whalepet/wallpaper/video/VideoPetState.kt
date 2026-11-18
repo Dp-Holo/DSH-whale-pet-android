@@ -34,6 +34,9 @@ class VideoPetState {
     var rotation = 0f
         private set
 
+    /** 当前音频脉动值（0..1），仅用于诊断落盘 */
+    val currentPulse: Float get() = pulse
+
     /** 每帧推进；dtScale 相对 16.67ms，保证高刷/掉帧下观感一致 */
     fun step(dtScale: Float) {
         // 音频脉动：向目标值靠近，避免包络抖动导致画面"抽搐"
