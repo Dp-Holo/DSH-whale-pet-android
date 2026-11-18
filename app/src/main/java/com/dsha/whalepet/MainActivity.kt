@@ -544,11 +544,22 @@ class MainActivity : AppCompatActivity() {
      */
     private fun openWallpaperPicker() {
         val target = ComponentName(this, com.dsha.whalepet.wallpaper.WhaleWallpaperService::class.java)
+        // 先查壁纸变更权限（系统 LiveWallpaperChange 用它决定是否直接 finish）
+        runCatching {
+            val ops = getSystemService(android.app.AppOpsManager::class.java)
+            val mode = ops.unsafeCheckOpNoThrow(
+                "android:change_wallpaper", android.os.Process.myUid(), packageName
+            )
+            logWallpaperDebug("appops change_wallpaper mode=$mode")
+        }.onFailure { logWallpaperDebug("appops check failed: ${it.message}") }
+
+        // 顺序：先列表（LiveWallpaperActivity，会列出所有动态壁纸），再直达预览，最后系统壁纸设置。
+        // 之前直达预览的 LiveWallpaperChange 会静默 finish，列表页更容易看出"是否识别到我们的服务"。
         val candidates = listOf(
+            Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER),
             Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).putExtra(
                 WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, target
             ),
-            Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER),
             Intent(Intent.ACTION_SET_WALLPAPER)
         )
         logWallpaperDebug("target=$target")

@@ -14,6 +14,14 @@
 避免特殊预览包污染正常的 1.1.x 序列。
 
 
+## 1.1.92
+
+壁纸入口继续诊断：
+
+- 记录 `AppOps` 的 `android:change_wallpaper` 模式（决定 LiveWallpaperChange 是否直接 finish）
+- 入口顺序改为「动态壁纸列表 → 直达预览 → 系统壁纸设置」，先看列表里能否识别到鲸鱼娘
+- 依据：反编译系统 `LiveWallpaperChange`，其 finish 条件为权限被拒 / 缺 extra / 查不到 WallpaperService 或壁纸元数据解析失败
+
 ## 1.1.91
 
 修复「点设为动态壁纸只有 toast、没有页面」：
