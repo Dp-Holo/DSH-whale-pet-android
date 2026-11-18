@@ -3,8 +3,6 @@ package com.dsha.whalepet
 import android.Manifest
 import android.content.Context
 import android.app.WallpaperManager
-import android.app.AppOpsManager
-import android.os.Process
 import android.os.SystemClock
 import android.content.ComponentName
 import android.content.Intent
@@ -41,17 +39,15 @@ import com.google.android.material.color.MaterialColors
  */
 class MainActivity : AppCompatActivity() {
 
-    companion object {
-        /** 直达壁纸预览的请求码；用于判断它是否秒退 */
-        const val REQ_WALLPAPER_DIRECT = 4102
-    }
-
     /** 直达预览的发起时刻；LiveWallpaperChange 因权限被拒会瞬间 finish，用时间差识别 */
     private var wallpaperDirectAt = 0L
 
     private companion object {
         /** 通知权限请求码（Android 13+ 运行时权限） */
         const val REQ_NOTIF = 1002
+
+        /** 直达壁纸预览的请求码；用于判断它是否秒退 */
+        const val REQ_WALLPAPER_DIRECT = 4102
 
         /** 自动授权重试的最小间隔：避免每次回界面都执行系统命令 */
         const val AUTO_GRANT_RETRY_INTERVAL_MS = 5 * 60_000L
@@ -555,14 +551,6 @@ class MainActivity : AppCompatActivity() {
      */
     private fun openWallpaperPicker() {
         val target = ComponentName(this, com.dsha.whalepet.wallpaper.WhaleWallpaperService::class.java)
-        // op 10045 = 系统 LiveWallpaperChange 里检查的 change_wallpaper，
-        // 被拒时预览 Activity 会直接 finish（表现为点了只有 toast）
-        runCatching {
-            val ops = getSystemService(AppOpsManager::class.java)
-            val mode = ops.checkOpNoThrow(10045, Process.myUid(), packageName)
-            logWallpaperDebug("appops op10045 mode=$mode (0=allowed,1=ignored,2=errored,3=default)")
-        }.onFailure { logWallpaperDebug("appops numeric check failed: ${it.message}") }
-
         // 与人工桌面一致：startActivityForResult 拉起 LiveWallpaperChange 直达预览
         val direct = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).putExtra(
             WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, target

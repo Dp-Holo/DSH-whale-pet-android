@@ -14,13 +14,16 @@
 避免特殊预览包污染正常的 1.1.x 序列。
 
 
+## 1.1.95
+
+修复 1.1.94 的编译错误：MainActivity 已有 companion object（新增第二个导致常量解析失败）；`AppOpsManager.checkOpNoThrow(Int,...)` 不是公开重载，去掉该诊断，改由"直达结果是否秒退"判断。
+
 ## 1.1.94
 
 壁纸入口对齐人工桌面的直达方式：
 
 - 反编译人工桌面确认其调用为 `startActivityForResult(CHANGE_LIVE_WALLPAPER + ComponentName)`
 - 改为直达预览 + `onActivityResult`：若被系统秒退（<1.5s、CANCELED），自动落到动态壁纸列表
-- 增加 AppOps `op 10045`（change_wallpaper）数值诊断，确认是否被 MIUI 拒绝
 
 ## 1.1.93
 
