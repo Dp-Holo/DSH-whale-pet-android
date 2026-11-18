@@ -105,3 +105,21 @@ PY
 | 点击/双击 | 弹跳反馈（切片段待内容） |
 | 锁屏/解锁/可见性 | 停帧/恢复 |
 | 充电/低电量/耳机 | 待接事件（复用现有监听即可） |
+
+## 10. 实测结果（小米 24122RKC7C / Android 16 / HyperOS 3，1.1.93）
+
+用合成素材（720×1280、带节拍音轨）在真机上验证，运行时数据来自
+`Android/data/com.dsha.whalepet/files/wallpaper_runtime.txt`：
+
+| 项 | 实测 |
+|---|---|
+| 解码器 | `player prepared w=720 h=1280`，硬解 `c2.qti.avc.decoder`，约 28fps |
+| 播放推进 | `pos` 5306 → 7309 → 1116（循环）持续增长 |
+| 音频脉动 | `pulse` 0.04 → 0.21 → 0.29 → 0.33 → 0.37 → 0.40，`scale` 1.001 → 1.010 |
+| 摇一摇 | 连续 3 次 `shake`，`rot` 出现非零（随后指数衰减回 0） |
+| 可见性 | `visible=false` → `player pause`；`visible=true` → `player resume` |
+| 不可见功耗 | 暂停后 10 秒进程 CPU = 0 tick（约 0%） |
+| Surface 重建 | 应用升级后 `surfaceDestroyed` → 重新 prepare，壁纸未丢失 |
+
+**结论**：视频播放、音频律动、摇一摇、可见性暂停/恢复四条链路均已打通。
+当前视频是合成彩条 + 节拍音（占位），替换正式素材后即为成品观感。
