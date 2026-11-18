@@ -3,6 +3,9 @@ package com.dsha.whalepet
 import android.Manifest
 import android.content.Context
 import android.app.WallpaperManager
+import android.app.AppOpsManager
+import android.os.Process
+import android.os.SystemClock
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -37,6 +40,14 @@ import com.google.android.material.color.MaterialColors
  * 也不依赖 Activity.onRequestPermissionsResult（Shizuku 不走该通道）。
  */
 class MainActivity : AppCompatActivity() {
+
+    companion object {
+        /** 直达壁纸预览的请求码；用于判断它是否秒退 */
+        const val REQ_WALLPAPER_DIRECT = 4102
+    }
+
+    /** 直达预览的发起时刻；LiveWallpaperChange 因权限被拒会瞬间 finish，用时间差识别 */
+    private var wallpaperDirectAt = 0L
 
     private companion object {
         /** 通知权限请求码（Android 13+ 运行时权限） */
@@ -544,40 +555,60 @@ class MainActivity : AppCompatActivity() {
      */
     private fun openWallpaperPicker() {
         val target = ComponentName(this, com.dsha.whalepet.wallpaper.WhaleWallpaperService::class.java)
-        // 先查壁纸变更权限（系统 LiveWallpaperChange 用它决定是否直接 finish）
+        // op 10045 = 系统 LiveWallpaperChange 里检查的 change_wallpaper，
+        // 被拒时预览 Activity 会直接 finish（表现为点了只有 toast）
         runCatching {
-            val ops = getSystemService(android.app.AppOpsManager::class.java)
-            val mode = ops.unsafeCheckOpNoThrow(
-                "android:change_wallpaper", android.os.Process.myUid(), packageName
-            )
-            logWallpaperDebug("appops change_wallpaper mode=$mode")
-        }.onFailure { logWallpaperDebug("appops check failed: ${it.message}") }
+            val ops = getSystemService(AppOpsManager::class.java)
+            val mode = ops.checkOpNoThrow(10045, Process.myUid(), packageName)
+            logWallpaperDebug("appops op10045 mode=$mode (0=allowed,1=ignored,2=errored,3=default)")
+        }.onFailure { logWallpaperDebug("appops numeric check failed: ${it.message}") }
 
-        // 顺序：先列表（LiveWallpaperActivity，会列出所有动态壁纸），再直达预览，最后系统壁纸设置。
-        // 之前直达预览的 LiveWallpaperChange 会静默 finish，列表页更容易看出"是否识别到我们的服务"。
-        val candidates = listOf(
-            Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER),
-            Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).putExtra(
-                WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, target
-            ),
-            Intent(Intent.ACTION_SET_WALLPAPER)
+        // 与人工桌面一致：startActivityForResult 拉起 LiveWallpaperChange 直达预览
+        val direct = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).putExtra(
+            WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, target
         )
-        logWallpaperDebug("target=$target")
-        for ((index, intent) in candidates.withIndex()) {
-            val resolved = runCatching { intent.resolveActivity(packageManager) }.getOrNull()
-            logWallpaperDebug("#${index + 1} action=${intent.action} resolved=$resolved")
-            // 注意：Android 11+ 包可见性会让 resolveActivity 返回 null，但 startActivity 仍可能成功；
-            // 因此不能因为 resolved == null 就跳过，直接尝试启动，失败再走下一级兜底。
+        logWallpaperDebug("direct resolve=${runCatching { direct.resolveActivity(packageManager) }.getOrNull()}")
+        wallpaperDirectAt = SystemClock.elapsedRealtime()
+        try {
+            startActivityForResult(direct, REQ_WALLPAPER_DIRECT)
+            logWallpaperDebug("direct started for result")
+        } catch (t: Throwable) {
+            logWallpaperDebug("direct failed: ${t.javaClass.name}: ${t.message}")
+            openWallpaperList()
+        }
+    }
+
+    /** 动态壁纸列表（LiveWallpaperActivity）：直达被系统拒绝时的兜底 */
+    private fun openWallpaperList() {
+        val chooser = Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)
+        logWallpaperDebug("list resolve=${runCatching { chooser.resolveActivity(packageManager) }.getOrNull()}")
+        try {
+            startActivity(chooser)
+            logWallpaperDebug("list started")
+        } catch (t: Throwable) {
+            logWallpaperDebug("list failed: ${t.javaClass.name}: ${t.message}")
+            val fallback = Intent(Intent.ACTION_SET_WALLPAPER)
             try {
-                startActivity(intent)
-                logWallpaperDebug("#${index + 1} started ok")
-                return
-            } catch (t: Throwable) {
-                logWallpaperDebug("#${index + 1} start failed: ${t.javaClass.name}: ${t.message}")
+                startActivity(fallback)
+                logWallpaperDebug("set-wallpaper started")
+            } catch (t2: Throwable) {
+                logWallpaperDebug("all failed: ${t2.message}")
+                Toast.makeText(this, R.string.wallpaper_picker_failed, Toast.LENGTH_LONG).show()
             }
         }
-        logWallpaperDebug("all candidates failed")
-        Toast.makeText(this, R.string.wallpaper_picker_failed, Toast.LENGTH_LONG).show()
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_WALLPAPER_DIRECT) {
+            val elapsed = SystemClock.elapsedRealtime() - wallpaperDirectAt
+            logWallpaperDebug("direct result=$resultCode elapsed=${elapsed}ms")
+            // 无缝秒退（<1.5s）基本判定为被 AppOps 拒绝后 finish，直接落到列表页
+            if (resultCode == RESULT_CANCELED && elapsed < 1500) {
+                logWallpaperDebug("direct cancelled quickly -> open list")
+                openWallpaperList()
+            }
+        }
     }
 
     /** 壁纸入口诊断：写应用外部目录，adb shell 可直接读（MIUI 会过滤 logcat 的第三方日志） */
