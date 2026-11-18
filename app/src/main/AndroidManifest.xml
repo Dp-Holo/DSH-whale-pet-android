@@ -1,6 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Android 11+ 包可见性：系统壁纸选择器不在默认可见范围内，
+         不声明 queries 时 resolveActivity/queryIntentActivities 会返回 null，
+         导致"点击设为动态壁纸没反应"。 -->
+    <queries>
+        <intent>
+            <action android:name="android.service.wallpaper.CHANGE_LIVE_WALLPAPER" />
+        </intent>
+        <intent>
+            <action android:name="android.service.wallpaper.LIVE_WALLPAPER_CHOOSER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SET_WALLPAPER" />
+        </intent>
+        <!-- 部分 ROM 的壁纸选择器是独立 system app，显式声明更稳 -->
+        <package android:name="com.android.wallpaper.livepicker" />
+    </queries>
+
     <!-- 悬浮窗权限：让鲸鱼娘显示在其他应用之上 -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- 前台服务：保证悬浮窗常驻 -->

@@ -555,7 +555,8 @@ class MainActivity : AppCompatActivity() {
         for ((index, intent) in candidates.withIndex()) {
             val resolved = runCatching { intent.resolveActivity(packageManager) }.getOrNull()
             logWallpaperDebug("#${index + 1} action=${intent.action} resolved=$resolved")
-            if (resolved == null) continue
+            // 注意：Android 11+ 包可见性会让 resolveActivity 返回 null，但 startActivity 仍可能成功；
+            // 因此不能因为 resolved == null 就跳过，直接尝试启动，失败再走下一级兜底。
             try {
                 startActivity(intent)
                 logWallpaperDebug("#${index + 1} started ok")

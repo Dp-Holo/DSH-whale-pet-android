@@ -14,6 +14,14 @@
 避免特殊预览包污染正常的 1.1.x 序列。
 
 
+## 1.1.91
+
+修复「点设为动态壁纸只有 toast、没有页面」：
+
+- 根因：Android 11+ 包可见性导致 `resolveActivity` 对三个系统壁纸 Intent 全返回 null，旧逻辑"解析不到就跳过"，因此一个都没启动
+- 修复：manifest 增加 `<queries>`（三个壁纸 Intent + `com.android.wallpaper.livepicker`）；启动逻辑不再因 resolved=null 跳过，直接尝试 `startActivity`，失败再兜底
+- 诊断日志继续写入 `wallpaper_debug.txt`
+
 ## 1.1.90
 
 壁纸入口改为文件诊断（MIUI 过滤第三方 logcat，Info 日志抓不到）：
