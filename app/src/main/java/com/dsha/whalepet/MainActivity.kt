@@ -137,7 +137,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btn_wallpaper).setOnClickListener {
             // 先给一个即时反馈：部分 ROM 的壁纸选择器启动很慢或静默失败，
             // 没有 toast 时用户会以为"点了没反应"
-            android.util.Log.i("WhalePet", "wallpaper button clicked")
+            logWallpaperDebug("click")
             Toast.makeText(this, R.string.wallpaper_opening, Toast.LENGTH_SHORT).show()
             openWallpaperPicker()
         }
@@ -533,6 +533,15 @@ class MainActivity : AppCompatActivity() {
      *  3) ACTION_SET_WALLPAPER（系统壁纸设置，用户可手动进"动态壁纸"）
      * 每一步都打日志：出问题时 logcat 里能直接看到是哪一级、解析到哪个 Activity。
      */
+    /**
+     * 打开系统动态壁纸选择器。
+     *
+     * 三级兜底（不同 ROM 支持度不一样，MIUI 上第一级可能"启动成功但没有界面"）：
+     *  1) ACTION_CHANGE_LIVE_WALLPAPER + 目标组件（能直接进我们的预览）
+     *  2) ACTION_LIVE_WALLPAPER_CHOOSER（动态壁纸总列表）
+     *  3) ACTION_SET_WALLPAPER（系统壁纸设置，用户可手动进"动态壁纸"）
+     * 每一步都写文件日志：MIUI 会过滤第三方 Info 日志，logcat 看不到，只能落盘排查。
+     */
     private fun openWallpaperPicker() {
         val target = ComponentName(this, com.dsha.whalepet.wallpaper.WhaleWallpaperService::class.java)
         val candidates = listOf(
@@ -542,16 +551,29 @@ class MainActivity : AppCompatActivity() {
             Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER),
             Intent(Intent.ACTION_SET_WALLPAPER)
         )
+        logWallpaperDebug("target=$target")
         for ((index, intent) in candidates.withIndex()) {
             val resolved = runCatching { intent.resolveActivity(packageManager) }.getOrNull()
-            android.util.Log.i("WhalePet", "wallpaper picker #${index + 1} action=${intent.action} resolved=$resolved")
+            logWallpaperDebug("#${index + 1} action=${intent.action} resolved=$resolved")
             if (resolved == null) continue
-            val launched = runCatching { startActivity(intent) }.isSuccess
-            android.util.Log.i("WhalePet", "wallpaper picker #${index + 1} launched=$launched")
-            if (launched) return
+            try {
+                startActivity(intent)
+                logWallpaperDebug("#${index + 1} started ok")
+                return
+            } catch (t: Throwable) {
+                logWallpaperDebug("#${index + 1} start failed: ${t.javaClass.name}: ${t.message}")
+            }
         }
-        android.util.Log.w("WhalePet", "wallpaper picker: no candidate launched")
+        logWallpaperDebug("all candidates failed")
         Toast.makeText(this, R.string.wallpaper_picker_failed, Toast.LENGTH_LONG).show()
+    }
+
+    /** 壁纸入口诊断：写应用外部目录，adb shell 可直接读（MIUI 会过滤 logcat 的第三方日志） */
+    private fun logWallpaperDebug(message: String) {
+        runCatching {
+            val dir = getExternalFilesDir(null) ?: filesDir
+            java.io.File(dir, "wallpaper_debug.txt").appendText("${System.currentTimeMillis()} $message\n")
+        }
     }
 
     private fun openNotificationSettings() {

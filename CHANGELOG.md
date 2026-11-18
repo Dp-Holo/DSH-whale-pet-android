@@ -14,6 +14,14 @@
 避免特殊预览包污染正常的 1.1.x 序列。
 
 
+## 1.1.90
+
+壁纸入口改为文件诊断（MIUI 过滤第三方 logcat，Info 日志抓不到）：
+
+- 点击与三级兜底的每一步写入 `Android/data/com.dsha.whalepet/files/wallpaper_debug.txt`
+- 记录 `resolveActivity` 结果、`startActivity` 成功/异常（含异常类型与消息）
+- 便于定位"只有 toast、没有页面"是解析不到 Activity、启动异常，还是启动了但被系统立刻结束
+
 ## 1.1.89
 
 壁纸入口诊断与加固（针对"点设为动态壁纸没反应"）：
