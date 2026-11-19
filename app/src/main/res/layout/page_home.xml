@@ -1,44 +1,85 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 第一页：主页（API Key / 余额 / 启停）。
-     授权类按钮与通知设置已移至「设置」页。 -->
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- 第一页：主页。
+     拇指区原则：内容（标题/形象/余额）在上方可滚动；所有可操作控件
+     （API Key、查余额、启停）集中在底部操作区，单手右手可及。 -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:layout_height="match_parent">
 
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingStart="24dp"
+            android:paddingTop="24dp"
+            android:paddingEnd="24dp"
+            android:paddingBottom="180dp">
+
+            <!-- 标题：主页保留顶部居中（主页 UI 后续单独设计） -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="@string/main_title"
+                android:textColor="@color/brand_primary"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <!-- 鲸鱼娘形象：尺寸与悬浮窗本体一致（96dp）、朝向也与桌宠初始朝向一致（镜像），
+                 启动时视觉上无缝"接替"，50ms 后本图隐藏 -->
+            <ImageView
+                android:id="@+id/iv_whale"
+                android:layout_width="96dp"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:adjustViewBounds="true"
+                android:contentDescription="@string/main_title"
+                android:scaleX="-1"
+                android:src="@drawable/home_whale" />
+
+            <TextView
+                android:id="@+id/tv_balance"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:text="@string/balance_hint"
+                android:textColor="@color/balance_main"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:gravity="center"
+                android:alpha="0.7"
+                android:text="@string/home_hint"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- 底部操作区：所有可点控件都在这里（右侧留出 FAB 的位置） -->
     <LinearLayout
+        android:id="@+id/home_action_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical|center_horizontal"
+        android:layout_gravity="bottom"
+        android:background="@color/surface_card"
+        android:elevation="8dp"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:paddingStart="16dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="68dp"
+        android:paddingBottom="16dp">
 
-        <!-- 标题：主页保留顶部居中（主页 UI 后续单独设计） -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="12dp"
-            android:fontFamily="sans-serif-medium"
-            android:text="@string/main_title"
-            android:textColor="@color/brand_primary"
-            android:textSize="20sp"
-            android:textStyle="bold" />
-
-        <!-- 鲸鱼娘形象：尺寸与悬浮窗本体一致（96dp）、朝向也与桌宠初始朝向一致（镜像），
-             启动时视觉上无缝"接替"，50ms 后本图隐藏 -->
-        <ImageView
-            android:id="@+id/iv_whale"
-            android:layout_width="96dp"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="12dp"
-            android:adjustViewBounds="true"
-            android:contentDescription="@string/main_title"
-            android:scaleX="-1"
-            android:src="@drawable/home_whale" />
-
-        <!-- API Key -->
         <EditText
             android:id="@+id/et_api_key"
             android:layout_width="match_parent"
@@ -47,42 +88,28 @@
             android:importantForAutofill="no"
             android:inputType="textPassword" />
 
-        <!-- 立即查余额 -->
-        <Button
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <Button
                 style="@style/Widget.WhalePet.Button"
-            android:id="@+id/btn_check_balance"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/check_balance_now" />
+                android:id="@+id/btn_check_balance"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/check_balance_now" />
 
-        <TextView
-            android:id="@+id/tv_balance"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:gravity="center"
-            android:text="@string/balance_hint"
-            android:textColor="@color/balance_main"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-
-        <!-- 启停：单按钮、全宽、位于所有按钮最底部 -->
-        <Button
+            <Button
                 style="@style/Widget.WhalePet.Button.Primary"
-            android:id="@+id/btn_toggle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="@string/start_service" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:gravity="center"
-            android:text="@string/home_hint"
-            android:alpha="0.7"
-            android:textSize="12sp" />
+                android:id="@+id/btn_toggle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="@string/start_service" />
+        </LinearLayout>
     </LinearLayout>
-</ScrollView>
+</FrameLayout>
