@@ -14,6 +14,13 @@
 避免特殊预览包污染正常的 1.1.x 序列。
 
 
+## 1.1.96
+
+壁纸直达预览：补 `android.permission.SET_WALLPAPER`。
+
+- 实测直达 `LiveWallpaperChange` 在 131ms 内返回 CANCELED，符合其 `withoutChangePermission()`（AppOps change_wallpaper）拒绝的特征
+- 人工桌面声明了该普通权限，我们此前没有；补上后重测直达
+
 ## 1.1.95
 
 修复 1.1.94 的编译错误：MainActivity 已有 companion object（新增第二个导致常量解析失败）；`AppOpsManager.checkOpNoThrow(Int,...)` 不是公开重载，去掉该诊断，改由"直达结果是否秒退"判断。

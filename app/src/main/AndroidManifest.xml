@@ -18,6 +18,9 @@
         <package android:name="com.android.wallpaper.livepicker" />
     </queries>
 
+    <!-- 设置壁纸：壁纸应用本身需要；系统 LiveWallpaperChange 的 change_wallpaper AppOps
+         默认与这条权限关联，缺失时直达预览会被静默 finish（只剩 toast）。 -->
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <!-- 悬浮窗权限：让鲸鱼娘显示在其他应用之上 -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- 前台服务：保证悬浮窗常驻 -->
