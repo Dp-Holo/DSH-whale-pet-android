@@ -14,7 +14,7 @@
 避免特殊预览包污染正常的 1.1.x 序列。
 
 
-## 1.2.0
+## 1.1.100
 
 壁纸直达诊断修正：`WallpaperInfo` 反射需带 `GET_META_DATA`（0x80），1.1.99 用 `MATCH_ALL` 取不到 meta-data，异常是诊断假阳性。本次记录 `loadXmlMetaData` 与 `WallpaperInfo` 的真实异常链。
 
