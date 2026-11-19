@@ -579,12 +579,12 @@ class MainActivity : AppCompatActivity() {
         }.onFailure { logWallpaperDebug("write_wallpaper mode check failed: ${it.message}") }
         runCatching {
             val svcIntent = Intent("android.service.wallpaper.WallpaperService").setPackage(packageName)
-            val list = packageManager.queryIntentServices(svcIntent, android.content.pm.PackageManager.MATCH_DEBUG_TRIAGED_MISSING)
+            val list = packageManager.queryIntentServices(svcIntent, android.content.pm.PackageManager.MATCH_ALL)
             logWallpaperDebug("query services=${list?.size} names=${list?.map { it.serviceInfo.name }}")
         }.onFailure { logWallpaperDebug("query services failed: ${it.message}") }
         runCatching {
             val svcIntent = Intent("android.service.wallpaper.WallpaperService").setPackage(packageName)
-            val ri = packageManager.queryIntentServices(svcIntent, android.content.pm.PackageManager.MATCH_DEBUG_TRIAGED_MISSING)?.firstOrNull()
+            val ri = packageManager.queryIntentServices(svcIntent, android.content.pm.PackageManager.MATCH_ALL)?.firstOrNull()
             if (ri != null) {
                 val ctor = Class.forName("android.app.WallpaperInfo")
                     .getConstructor(android.content.Context::class.java, android.content.pm.ResolveInfo::class.java)
