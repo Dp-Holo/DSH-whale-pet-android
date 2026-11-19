@@ -19,7 +19,7 @@
             android:paddingStart="24dp"
             android:paddingTop="24dp"
             android:paddingEnd="24dp"
-            android:paddingBottom="180dp">
+            android:paddingBottom="200dp">
 
             <!-- 标题：主页保留顶部居中（主页 UI 后续单独设计） -->
             <TextView

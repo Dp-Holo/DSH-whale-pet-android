@@ -89,7 +89,6 @@
                 android:id="@+id/tab_line_normal"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:minWidth="88dp"
                 android:text="@string/line_type_normal" />
 
             <Button
@@ -98,7 +97,6 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
-                android:minWidth="88dp"
                 android:text="@string/line_type_gain" />
 
             <Button
@@ -107,7 +105,6 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
-                android:minWidth="88dp"
                 android:text="@string/line_type_loss" />
         </LinearLayout>
     </LinearLayout>
