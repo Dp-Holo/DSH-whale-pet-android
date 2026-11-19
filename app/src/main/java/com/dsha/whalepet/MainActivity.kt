@@ -565,6 +565,35 @@ class MainActivity : AppCompatActivity() {
             WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, target
         )
         logWallpaperDebug("direct resolve=${runCatching { direct.resolveActivity(packageManager) }.getOrNull()}")
+        // —— 诊断：复现 LiveWallpaperChange.init() 的几个前置条件 ——
+        runCatching {
+            val extra = direct.getParcelableExtra<ComponentName>(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT)
+            logWallpaperDebug("direct hasExtra=${direct.hasExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT)} extra=$extra")
+        }.onFailure { logWallpaperDebug("direct extra read failed: ${it.message}") }
+        runCatching {
+            val ops = getSystemService(android.app.AppOpsManager::class.java)
+            val mode = ops.unsafeCheckOpNoThrow(
+                "android:write_wallpaper", android.os.Process.myUid(), packageName
+            )
+            logWallpaperDebug("write_wallpaper mode=$mode")
+        }.onFailure { logWallpaperDebug("write_wallpaper mode check failed: ${it.message}") }
+        runCatching {
+            val svcIntent = Intent("android.service.wallpaper.WallpaperService").setPackage(packageName)
+            val list = packageManager.queryIntentServices(svcIntent, android.content.pm.PackageManager.MATCH_DEBUG_TRIAGED_MISSING)
+            logWallpaperDebug("query services=${list?.size} names=${list?.map { it.serviceInfo.name }}")
+        }.onFailure { logWallpaperDebug("query services failed: ${it.message}") }
+        runCatching {
+            val svcIntent = Intent("android.service.wallpaper.WallpaperService").setPackage(packageName)
+            val ri = packageManager.queryIntentServices(svcIntent, android.content.pm.PackageManager.MATCH_DEBUG_TRIAGED_MISSING)?.firstOrNull()
+            if (ri != null) {
+                val ctor = Class.forName("android.app.WallpaperInfo")
+                    .getConstructor(android.content.Context::class.java, android.content.pm.ResolveInfo::class.java)
+                val info = ctor.newInstance(this, ri)
+                logWallpaperDebug("WallpaperInfo ok: $info")
+            } else {
+                logWallpaperDebug("WallpaperInfo skipped: no resolveInfo")
+            }
+        }.onFailure { logWallpaperDebug("WallpaperInfo failed: ${it.javaClass.simpleName}: ${it.message}") }
         wallpaperDirectAt = SystemClock.elapsedRealtime()
         try {
             startActivityForResult(direct, REQ_WALLPAPER_DIRECT)

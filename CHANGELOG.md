@@ -14,6 +14,13 @@
 避免特殊预览包污染正常的 1.1.x 序列。
 
 
+## 1.1.98
+
+壁纸直达诊断（1.1.97 授权后仍秒退）：
+
+- 记录 extra 是否存在/内容、`write_wallpaper` 实际 mode、`queryIntentServices` 结果、`WallpaperInfo` 反射解析结果
+- 用于区分是"附加参数丢失"、"AppOps 仍拒绝"、"服务查询为空"还是"壁纸元数据解析失败"
+
 ## 1.1.97
 
 壁纸直达预览：用 Shizuku 授予 `android:write_wallpaper` AppOp。
