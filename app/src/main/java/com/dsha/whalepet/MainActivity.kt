@@ -42,10 +42,6 @@ class MainActivity : AppCompatActivity() {
     /** 直达预览的发起时刻；LiveWallpaperChange 因权限被拒会瞬间 finish，用时间差识别 */
     private var wallpaperDirectAt = 0L
 
-    /** 是否已通过 Shizuku 授予 android:write_wallpaper；一次会话内只尝试一次 */
-    private var wallpaperOpGranted = false
-    private var wallpaperOpTried = false
-
     private companion object {
         /** 通知权限请求码（Android 13+ 运行时权限） */
         const val REQ_NOTIF = 1002
@@ -539,23 +535,14 @@ class MainActivity : AppCompatActivity() {
      * 打开系统动态壁纸选择器。
      *
      * 优先与人工桌面一致：`startActivityForResult(CHANGE_LIVE_WALLPAPER + 组件)` 直达预览。
-     * MIUI 的 LiveWallpaperChange 会检查 `android:write_wallpaper` AppOps，被拒会瞬间 finish；
-     * 因此先用 Shizuku 给自己授予该 op（白名单命令），再直达；仍秒退则落到动态壁纸列表。
+     * 实测根因：MIUI 的「动态壁纸服务」特殊授权缺失时，LiveWallpaperChange 会瞬间 finish
+     *（AppOps `android:write_wallpaper` 并非决定因素，授权后 mode 已是 0 仍被拦）。
+     * 因此这里只负责发起直达；秒退由 onActivityResult 弹「去授权 / 去列表」引导。
      */
     private fun openWallpaperPicker() {
-        logWallpaperDebug("open picker, granted=$wallpaperOpGranted tried=$wallpaperOpTried")
-        if (wallpaperOpGranted || wallpaperOpTried || !ShizukuHelper.isAvailable()) {
-            launchWallpaperDirect()
-            return
-        }
-        wallpaperOpTried = true
-        Thread {
-            val result = runCatching { ShizukuHelper.grantWriteWallpaper(this) }
-                .getOrElse { "异常: ${it.message}" }
-            wallpaperOpGranted = result.startsWith("exit=0")
-            logWallpaperDebug("grant write_wallpaper: $result -> granted=$wallpaperOpGranted")
-            runOnUiThread { launchWallpaperDirect() }
-        }.start()
+        // 直达预览依赖 MIUI 的「动态壁纸服务」特殊授权；缺失时系统会秒退，
+        // 由 onActivityResult 弹出「去授权 / 去列表」引导（用户授权后即可直达）。
+        launchWallpaperDirect()
     }
 
     /** 直达预览（LiveWallpaperChange）；秒退由 onActivityResult 兜底到列表 */

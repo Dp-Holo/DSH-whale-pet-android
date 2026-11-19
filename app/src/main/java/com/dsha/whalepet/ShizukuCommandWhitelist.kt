@@ -23,14 +23,9 @@ object ShizukuCommandWhitelist {
     fun isAllowed(args: Array<String>): Boolean {
         // appops set <pkg> SYSTEM_ALERT_WINDOW allow
         if (args.size == 5) {
-            if (args[0] != "appops" || args[1] != "set" ||
-                args[2] !in ALLOWED_PACKAGES || args[4] != "allow"
-            ) {
-                return false
-            }
-            // SYSTEM_ALERT_WINDOW：悬浮窗自动授权
-            // android:write_wallpaper：直达系统壁纸预览所需的 AppOps（framework 里的 op 名）
-            return args[3] == "SYSTEM_ALERT_WINDOW" || args[3] == "android:write_wallpaper"
+            return args[0] == "appops" && args[1] == "set" &&
+                args[2] in ALLOWED_PACKAGES &&
+                args[3] == "SYSTEM_ALERT_WINDOW" && args[4] == "allow"
         }
         if (args.size == 4) {
             // pm grant <pkg> android.permission.POST_NOTIFICATIONS
