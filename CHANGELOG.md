@@ -14,6 +14,15 @@
 避免特殊预览包污染正常的 1.1.x 序列。
 
 
+## 1.1.97
+
+壁纸直达预览：用 Shizuku 授予 `android:write_wallpaper` AppOp。
+
+- 白名单新增 `appops set <本应用> android:write_wallpaper allow`（op 名从 framework.jar 确认）
+- 点入口时先在后台线程授权，再走 `startActivityForResult(CHANGE_LIVE_WALLPAPER)` 直达
+- 若仍秒退（无 Shizuku/授权失败），自动落到动态壁纸列表
+- 白名单测试补充"允许本应用 / 拒绝冒名包名与非白名单 op"
+
 ## 1.1.96
 
 壁纸直达预览：补 `android.permission.SET_WALLPAPER`。

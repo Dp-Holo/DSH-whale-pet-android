@@ -32,6 +32,15 @@ class ShizukuCommandWhitelistTest {
     }
 
     @Test
+    fun allowsWriteWallpaperOpForOwnPackageOnly() {
+        assertTrue(allowed("appops", "set", "com.dsha.whalepet", "android:write_wallpaper", "allow"))
+        assertTrue(allowed("appops", "set", "com.dsha.whalepet.debug", "android:write_wallpaper", "allow"))
+        assertFalse(allowed("appops", "set", "com.dsha.whalepet", "android:write_wallpaper", "deny"))
+        assertFalse(allowed("appops", "set", "com.dsha.whalepet.evil", "android:write_wallpaper", "allow"))
+        assertFalse(allowed("appops", "set", "com.dsha.whalepet", "android:write_settings", "allow"))
+    }
+
+    @Test
     fun rejectsImpostorPackageWithSamePrefix() {
         // 1.1.30 修掉的攻击面：前缀匹配会让这两个包名被静默授权
         assertFalse(allowed("appops", "set", "com.dsha.whalepet.evil", "SYSTEM_ALERT_WINDOW", "allow"))

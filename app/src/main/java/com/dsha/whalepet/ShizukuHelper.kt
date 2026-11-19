@@ -262,6 +262,14 @@ object ShizukuHelper {
      * 命令仍由 UserService 侧的白名单校验，只有以本应用包名为目标的那几条能通过；
      * 插件无法借此执行任意 shell。
      */
+    /**
+     * 授予本应用「修改壁纸」AppOp（op 名 `android:write_wallpaper`，见 framework）。
+     * 系统 `LiveWallpaperChange` 会检查它，缺失时直达预览会被静默 finish。
+     * 须在后台线程调用（最多阻塞 5 秒）。
+     */
+    fun grantWriteWallpaper(ctx: Context): String =
+        execWhitelistedSync(ctx, listOf("appops", "set", ctx.packageName, "android:write_wallpaper", "allow"))
+
     fun execWhitelistedSync(ctx: Context, args: List<String>): String {
         appPackage = ctx.packageName
         if (!isAvailable()) return "Shizuku 不可用"

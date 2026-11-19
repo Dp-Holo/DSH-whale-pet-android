@@ -42,6 +42,10 @@ class MainActivity : AppCompatActivity() {
     /** 直达预览的发起时刻；LiveWallpaperChange 因权限被拒会瞬间 finish，用时间差识别 */
     private var wallpaperDirectAt = 0L
 
+    /** 是否已通过 Shizuku 授予 android:write_wallpaper；一次会话内只尝试一次 */
+    private var wallpaperOpGranted = false
+    private var wallpaperOpTried = false
+
     private companion object {
         /** 通知权限请求码（Android 13+ 运行时权限） */
         const val REQ_NOTIF = 1002
@@ -534,24 +538,29 @@ class MainActivity : AppCompatActivity() {
     /**
      * 打开系统动态壁纸选择器。
      *
-     * 三级兜底（不同 ROM 支持度不一样，MIUI 上第一级可能"启动成功但没有界面"）：
-     *  1) ACTION_CHANGE_LIVE_WALLPAPER + 目标组件（能直接进我们的预览）
-     *  2) ACTION_LIVE_WALLPAPER_CHOOSER（动态壁纸总列表）
-     *  3) ACTION_SET_WALLPAPER（系统壁纸设置，用户可手动进"动态壁纸"）
-     * 每一步都打日志：出问题时 logcat 里能直接看到是哪一级、解析到哪个 Activity。
-     */
-    /**
-     * 打开系统动态壁纸选择器。
-     *
-     * 三级兜底（不同 ROM 支持度不一样，MIUI 上第一级可能"启动成功但没有界面"）：
-     *  1) ACTION_CHANGE_LIVE_WALLPAPER + 目标组件（能直接进我们的预览）
-     *  2) ACTION_LIVE_WALLPAPER_CHOOSER（动态壁纸总列表）
-     *  3) ACTION_SET_WALLPAPER（系统壁纸设置，用户可手动进"动态壁纸"）
-     * 每一步都写文件日志：MIUI 会过滤第三方 Info 日志，logcat 看不到，只能落盘排查。
+     * 优先与人工桌面一致：`startActivityForResult(CHANGE_LIVE_WALLPAPER + 组件)` 直达预览。
+     * MIUI 的 LiveWallpaperChange 会检查 `android:write_wallpaper` AppOps，被拒会瞬间 finish；
+     * 因此先用 Shizuku 给自己授予该 op（白名单命令），再直达；仍秒退则落到动态壁纸列表。
      */
     private fun openWallpaperPicker() {
+        logWallpaperDebug("open picker, granted=$wallpaperOpGranted tried=$wallpaperOpTried")
+        if (wallpaperOpGranted || wallpaperOpTried || !ShizukuHelper.isAvailable()) {
+            launchWallpaperDirect()
+            return
+        }
+        wallpaperOpTried = true
+        Thread {
+            val result = runCatching { ShizukuHelper.grantWriteWallpaper(this) }
+                .getOrElse { "异常: ${it.message}" }
+            wallpaperOpGranted = result.startsWith("exit=0")
+            logWallpaperDebug("grant write_wallpaper: $result -> granted=$wallpaperOpGranted")
+            runOnUiThread { launchWallpaperDirect() }
+        }.start()
+    }
+
+    /** 直达预览（LiveWallpaperChange）；秒退由 onActivityResult 兜底到列表 */
+    private fun launchWallpaperDirect() {
         val target = ComponentName(this, com.dsha.whalepet.wallpaper.WhaleWallpaperService::class.java)
-        // 与人工桌面一致：startActivityForResult 拉起 LiveWallpaperChange 直达预览
         val direct = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).putExtra(
             WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, target
         )
