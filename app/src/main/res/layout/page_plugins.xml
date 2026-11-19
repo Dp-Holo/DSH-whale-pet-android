@@ -59,33 +59,36 @@
             android:textStyle="bold" />
 
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="end"
             android:layout_marginTop="8dp"
             android:orientation="horizontal">
 
             <Button
                 style="@style/Widget.WhalePet.Button.Primary"
                 android:id="@+id/btn_plugin_install"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:minWidth="120dp"
                 android:text="@string/plugin_install" />
 
             <Button
                 style="@style/Widget.WhalePet.Button"
                 android:id="@+id/btn_plugin_import"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
-                android:layout_weight="1"
+                android:minWidth="120dp"
                 android:text="@string/plugin_import_from_file" />
         </LinearLayout>
 
         <Button
             style="@style/Widget.WhalePet.Button"
             android:id="@+id/btn_plugin_sample"
-            android:layout_width="match_parent"
+            android:layout_gravity="end"
+            android:layout_width="wrap_content"
+            android:minWidth="120dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:text="@string/plugin_install_sample" />

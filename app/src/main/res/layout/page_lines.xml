@@ -76,37 +76,38 @@
                 android:src="@drawable/ic_add_line" />
         </LinearLayout>
 
-        <!-- 台词分类：普通（单击）/ 充值（余额增加）/ 消费（余额减少） -->
+        <!-- 台词分类：右对齐紧凑排布，离右手拇指更近 -->
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="end"
             android:layout_marginTop="8dp"
             android:orientation="horizontal">
 
             <Button
                 style="@style/Widget.WhalePet.Button"
                 android:id="@+id/tab_line_normal"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:minWidth="88dp"
                 android:text="@string/line_type_normal" />
 
             <Button
                 style="@style/Widget.WhalePet.Button"
                 android:id="@+id/tab_line_gain"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
-                android:layout_weight="1"
+                android:minWidth="88dp"
                 android:text="@string/line_type_gain" />
 
             <Button
                 style="@style/Widget.WhalePet.Button"
                 android:id="@+id/tab_line_loss"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
-                android:layout_weight="1"
+                android:minWidth="88dp"
                 android:text="@string/line_type_loss" />
         </LinearLayout>
     </LinearLayout>
