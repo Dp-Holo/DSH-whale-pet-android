@@ -577,23 +577,33 @@ class MainActivity : AppCompatActivity() {
             )
             logWallpaperDebug("write_wallpaper mode=$mode")
         }.onFailure { logWallpaperDebug("write_wallpaper mode check failed: ${it.message}") }
+        // 用与系统 livepicker 相同的 flag（GET_META_DATA=0x80）重新验证，避免上次 MATCH_ALL
+        // 不带 meta-data 造成的假阳性
         runCatching {
             val svcIntent = Intent("android.service.wallpaper.WallpaperService").setPackage(packageName)
-            val list = packageManager.queryIntentServices(svcIntent, android.content.pm.PackageManager.MATCH_ALL)
-            logWallpaperDebug("query services=${list?.size} names=${list?.map { it.serviceInfo.name }}")
-        }.onFailure { logWallpaperDebug("query services failed: ${it.message}") }
-        runCatching {
-            val svcIntent = Intent("android.service.wallpaper.WallpaperService").setPackage(packageName)
-            val ri = packageManager.queryIntentServices(svcIntent, android.content.pm.PackageManager.MATCH_ALL)?.firstOrNull()
+            val list = packageManager.queryIntentServices(svcIntent, android.content.pm.PackageManager.GET_META_DATA)
+            val ri = list?.firstOrNull()
+            logWallpaperDebug("query(GET_META_DATA)=${list?.size} name=${ri?.serviceInfo?.name} meta=${ri?.serviceInfo?.metaData}")
             if (ri != null) {
+                val parser = ri.serviceInfo.loadXmlMetaData(packageManager, "android.service.wallpaper")
+                logWallpaperDebug("loadXmlMetaData=${parser != null}")
+                parser?.close()
                 val ctor = Class.forName("android.app.WallpaperInfo")
                     .getConstructor(android.content.Context::class.java, android.content.pm.ResolveInfo::class.java)
-                val info = ctor.newInstance(this, ri)
-                logWallpaperDebug("WallpaperInfo ok: $info")
-            } else {
-                logWallpaperDebug("WallpaperInfo skipped: no resolveInfo")
+                try {
+                    val info = ctor.newInstance(this, ri)
+                    logWallpaperDebug("WallpaperInfo ok: $info")
+                } catch (t: Throwable) {
+                    var c: Throwable? = t
+                    val sb = StringBuilder()
+                    while (c != null && sb.length < 300) {
+                        sb.append(c.javaClass.name).append(": ").append(c.message).append(" <- ")
+                        c = c.cause
+                    }
+                    logWallpaperDebug("WallpaperInfo failed: $sb")
+                }
             }
-        }.onFailure { logWallpaperDebug("WallpaperInfo failed: ${it.javaClass.simpleName}: ${it.message}") }
+        }.onFailure { logWallpaperDebug("diagnose failed: ${it.message}") }
         wallpaperDirectAt = SystemClock.elapsedRealtime()
         try {
             startActivityForResult(direct, REQ_WALLPAPER_DIRECT)
