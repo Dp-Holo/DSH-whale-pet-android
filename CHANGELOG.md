@@ -14,6 +14,14 @@
 避免特殊预览包污染正常的 1.1.x 序列。
 
 
+## 1.1.101
+
+壁纸直达被拦时改为「授权引导弹窗」：
+
+- 直达秒退（<1.5s）不再默默跳列表，而是弹窗：去授权（MIUI 应用权限页）/ 去列表 / 取消
+- 授权入口优先 `miui.intent.action.APP_PERM_EDITOR`（extra_pkgname），无 MIUI 编辑器时退回系统应用详情页
+- 依据：人工桌面与我们的 manifest 权限一致，差异在 MIUI 的“动态壁纸服务”特殊授权，应用只能引导用户去开
+
 ## 1.1.100
 
 壁纸直达诊断修正：`WallpaperInfo` 反射需带 `GET_META_DATA`（0x80），1.1.99 用 `MATCH_ALL` 取不到 meta-data，异常是诊断假阳性。本次记录 `loadXmlMetaData` 与 `WallpaperInfo` 的真实异常链。

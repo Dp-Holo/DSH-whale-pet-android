@@ -125,4 +125,9 @@
     <string name="wallpaper_default_line">今天也要好好摸鱼呀～</string>
     <string name="wallpaper_picker_failed">没有找到可用的壁纸选择器</string>
     <string name="wallpaper_opening">正在打开壁纸选择器…</string>
+    <string name="wallpaper_perm_title">需要动态壁纸服务权限</string>
+    <string name="wallpaper_perm_message">系统拦截了直达预览。请为「鲸鱼娘桌宠」开启“动态壁纸服务/修改壁纸”权限，或从动态壁纸列表手动选择。</string>
+    <string name="wallpaper_perm_grant">去授权</string>
+    <string name="wallpaper_perm_list">去列表</string>
+    <string name="wallpaper_perm_cancel">取消</string>
 </resources>

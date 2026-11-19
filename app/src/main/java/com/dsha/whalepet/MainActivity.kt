@@ -614,6 +614,60 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * 直达被 MIUI 拦截时的授权引导。
+     *
+     * 系统 `LiveWallpaperChange` 会检查「动态壁纸服务/修改壁纸」相关权限，缺失时秒退；
+     * 应用无法自行授予，只能把用户带到 MIUI 权限页（或给列表入口兜底）。
+     */
+    private fun showWallpaperPermissionDialog() {
+        logWallpaperDebug("show permission dialog")
+        android.app.AlertDialog.Builder(this)
+            .setTitle(R.string.wallpaper_perm_title)
+            .setMessage(R.string.wallpaper_perm_message)
+            .setPositiveButton(R.string.wallpaper_perm_grant) { d, _ ->
+                d.dismiss()
+                openMiuiPermissionEditor()
+            }
+            .setNeutralButton(R.string.wallpaper_perm_list) { d, _ ->
+                d.dismiss()
+                openWallpaperList()
+            }
+            .setNegativeButton(R.string.wallpaper_perm_cancel) { d, _ -> d.dismiss() }
+            .show()
+    }
+
+    /** 打开 MIUI 的「应用权限管理」页；没有 MIUI 编辑器时退回系统应用详情页 */
+    private fun openMiuiPermissionEditor() {
+        val candidates = listOf(
+            Intent("miui.intent.action.APP_PERM_EDITOR").apply {
+                putExtra("extra_pkgname", packageName)
+                setClassName(
+                    "com.miui.securitycenter",
+                    "com.miui.permcenter.permissions.PermissionsEditorActivity"
+                )
+            },
+            Intent(
+                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                android.net.Uri.parse("package:$packageName")
+            )
+        )
+        for ((index, intent) in candidates.withIndex()) {
+            val resolved = runCatching { intent.resolveActivity(packageManager) }.getOrNull()
+            logWallpaperDebug("perm editor #${index + 1} resolved=$resolved")
+            if (resolved == null) continue
+            try {
+                startActivity(intent)
+                logWallpaperDebug("perm editor #${index + 1} started")
+                return
+            } catch (t: Throwable) {
+                logWallpaperDebug("perm editor #${index + 1} failed: ${t.message}")
+            }
+        }
+        logWallpaperDebug("perm editor: none available")
+        Toast.makeText(this, R.string.wallpaper_picker_failed, Toast.LENGTH_LONG).show()
+    }
+
     /** 动态壁纸列表（LiveWallpaperActivity）：直达被系统拒绝时的兜底 */
     private fun openWallpaperList() {
         val chooser = Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)
@@ -639,10 +693,10 @@ class MainActivity : AppCompatActivity() {
         if (requestCode == REQ_WALLPAPER_DIRECT) {
             val elapsed = SystemClock.elapsedRealtime() - wallpaperDirectAt
             logWallpaperDebug("direct result=$resultCode elapsed=${elapsed}ms")
-            // 无缝秒退（<1.5s）基本判定为被 AppOps 拒绝后 finish，直接落到列表页
+            // 无缝秒退（<1.5s）判定为被系统权限拦截：给用户两个明确选择
             if (resultCode == RESULT_CANCELED && elapsed < 1500) {
-                logWallpaperDebug("direct cancelled quickly -> open list")
-                openWallpaperList()
+                logWallpaperDebug("direct cancelled quickly -> show permission dialog")
+                showWallpaperPermissionDialog()
             }
         }
     }
